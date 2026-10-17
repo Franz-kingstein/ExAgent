@@ -25,9 +25,11 @@ researched on a **fully simulated banking agent with completely synthetic/fake f
 
 ## Status
 
-Phase 2 — structured execution traces: done (trace schema, recorder, agent
-integration, committed sample trace; 73 tests passing). Explanations, anomaly
-detection, counterfactuals, and judges are **not implemented yet**.
+Phase 3 — decision explainability (Q1): done — deterministic
+requirement-to-action matching over trace evidence, per-requirement assessments
+(SATISFIED/VIOLATED/UNKNOWN with evidence citations, conflict reporting),
+concise rationale generation; 89 tests passing. Anomaly detection,
+counterfactuals, and judges are **not implemented yet**.
 
 ## Quickstart
 
@@ -41,16 +43,16 @@ uv venv --system-site-packages --python /usr/bin/python3.11 .venv   # already do
 
 ```
 docs/        architecture, safety policy, phase plan
-configs/     bank_dataset.yaml (synthetic accounts), scenarios, judge prompts
+configs/     bank_dataset.yaml · requirements_bank.yaml (registry), scenarios, judge prompts
 src/trace_xai/
   banking/       state.py · dataset.py · environment.py · results.py   (Phase 1 ✔)
-  core/          trace.py (schema) · recorder.py                       (Phase 2 ✔)
   agent/         parser.py · rule_agent.py · langchain_agent.py · langchain_tools.py (Phase 1 ✔)
-  requirements/  requirement registry + matching                        (Phase 2)
-  explain/       Q1 decision, Q2 deviation, Q3 counterfactual           (Phase 2-4)
-  validate/      Q4 verifier, guardrails, LLM/SLM judge                 (Phase 4)
+  core/          trace.py (schema) · recorder.py                       (Phase 2 ✔)
+  requirements/  model.py (registry + constraint types)                (Phase 3 ✔)
+  explain/       matcher.py · decision.py · models.py (Q1)             (Phase 3 ✔)
+  validate/      Q4 verifier, guardrails, LLM/SLM judge                 (Phase 5)
   llm/           LLM client (local Ollama default, fully optional)
 data/        synthetic datasets, traces (sample_transfer_success.json), requirements
-experiments/ phase1_demo.py · phase2_sample_trace.py and future paper artifacts
+experiments/ phase1_demo.py · phase2_sample_trace.py · phase3_demo.py
 tests/       unit (deterministic) + integration (LLM, auto-skip)
 ```

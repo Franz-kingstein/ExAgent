@@ -72,12 +72,19 @@ class BankEnvironment:
         """Compact, deterministic observable-state summary for traces.
 
         This is what trace events record in state_before/state_after; it is
-        an *observation*, not a copy of the full state.
+        an *observation*, not a copy of the full state. XAI matchers rely on
+        these fields as evidence, so they must stay honest and complete.
         """
         return {
             "fingerprint": self.fingerprint(),
             "balances": {
                 aid: acc.balance_inr for aid, acc in sorted(self._state.accounts.items())
+            },
+            "per_txn_limits": {
+                aid: acc.per_txn_limit_inr for aid, acc in sorted(self._state.accounts.items())
+            },
+            "beneficiaries_verified": {
+                bid: b.verified for bid, b in sorted(self._state.beneficiaries.items())
             },
             "ledger_size": len(self._state.transactions),
             "tx_counter": self._state.tx_counter,

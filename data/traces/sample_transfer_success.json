@@ -51,6 +51,15 @@
           "ACC-SYN-001": 250000,
           "ACC-SYN-002": 5000
         },
+        "per_txn_limits": {
+          "ACC-SYN-001": 50000,
+          "ACC-SYN-002": 10000
+        },
+        "beneficiaries_verified": {
+          "BOB-001": true,
+          "BOB-002": false,
+          "BOB-003": true
+        },
         "ledger_size": 0,
         "tx_counter": 0
       },
@@ -93,6 +102,15 @@
         "balances": {
           "ACC-SYN-001": 240000,
           "ACC-SYN-002": 5000
+        },
+        "per_txn_limits": {
+          "ACC-SYN-001": 50000,
+          "ACC-SYN-002": 10000
+        },
+        "beneficiaries_verified": {
+          "BOB-001": true,
+          "BOB-002": false,
+          "BOB-003": true
         },
         "ledger_size": 1,
         "tx_counter": 1

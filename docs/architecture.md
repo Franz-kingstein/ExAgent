@@ -100,6 +100,29 @@ core/
 - Committed artifact: `data/traces/sample_transfer_success.json` — usable by
   TRACE-XAI without re-running any agent.
 
+## Decision explainability (Phase 3, delivered)
+
+```
+requirements/model.py   ConstraintType (closed set), Requirement, load_requirements
+explain/matcher.py      fact extraction + deterministic candidate observation/merge
+explain/decision.py     DecisionExplainer -> DecisionExplanation (+ rationale)
+explain/models.py       RequirementStatus, EvidenceItem, RequirementAssessment
+configs/requirements_bank.yaml   machine-readable requirement registry
+```
+
+- Algorithm: extract observable facts from the trace → per requirement, collect
+  candidate observations (deterministic comparison when operands are in
+  evidence; environment `reason_code` as authoritative outcome evidence) →
+  merge: no candidates ⇒ `UNKNOWN`; disagreeing ⇒ `UNKNOWN` + conflict list;
+  agreement ⇒ status with confidence 0.95 (deterministic) or 0.9 (outcome).
+- Every `EvidenceItem` is `EVENT_ID.DOTTED.FIELD=VALUE` — auditors can resolve
+  each citation against the trace (enforced by test).
+- Missing evidence is never assumed satisfied; conflicts are never silently
+  resolved. No LLM anywhere in this path (`llm_used=False` by design).
+- `BankEnvironment.summary()` exposes `per_txn_limits` and
+  `beneficiaries_verified` so limits/verification are *trace evidence*, not
+  hidden knowledge.
+
 ## Phase plan
 
 See `docs/phases.md`.

@@ -11,11 +11,17 @@
       `ExecutionRecorder`, rule+LLM agent integration (`run_traced`), honest nulls
       for missing evidence, conflict representation, committed sample trace,
       73 passing tests.
-- [ ] **Phase 3 — Evidence store + Q1 decision explainability** *(recommended next)*:
-      `EvidenceStore` (SHA-256 content hashes over trace events), Claim labels
-      FACT/EVIDENCE/INFERENCE/UNKNOWN, requirement registry
-      (`configs/requirements_bank.yaml`), requirement-to-action matching, first
-      evidence-grounded decision explanations.
+- [x] **Phase 3 — Q1 decision explainability**: machine-readable requirement registry
+      (`configs/requirements_bank.yaml`), deterministic requirement-to-action matcher,
+      per-requirement assessments (SATISFIED/VIOLATED/UNKNOWN) with evidence
+      citations, conflict reporting, concise rationale; 89 passing tests.
+- [ ] **Phase 4 — Q2 behavior-deviation explainability** *(recommended next)*:
+      trajectory anomaly detection over traces (unexpected sequences, missing steps,
+      outcome/state inconsistencies) + deviation explanations citing evidence.
+      Requirement-checking half of Q2 landed in Phase 3.
+- [ ] **Phase 5 — Q3 counterfactuals + Q4 validation**: alternative-action
+      comparison and controlled replay; evidence store, rule verifier,
+      guardrails, LLM/SLM judge (local Ollama), golden fixtures.
 - [ ] **Phase 3 — Q2 Deviation**: hybrid requirement checking (hard/soft rules) +
       trajectory anomaly detection.
 - [ ] **Phase 4 — Q3 Counterfactual**: alternative-action enumeration, comparison,
