@@ -1,0 +1,37 @@
+# SYNTHETIC / FAKE DATA - see docs/safety.md.
+# No real accounts, beneficiaries, or balances. Deterministic by design.
+meta:
+  seed: 42
+  synthetic: true
+  notice: "All names, accounts, and amounts below are fabricated for research."
+
+accounts:
+  - id: ACC-SYN-001
+    owner_name: "Asha Patel (fake)"
+    balance_inr: 250000
+    per_txn_limit_inr: 50000
+    beneficiary_ids: [BOB-001, BOB-002, BOB-003]
+    status: ACTIVE
+  - id: ACC-SYN-002
+    owner_name: "Ravi Kumar (fake)"
+    balance_inr: 5000
+    per_txn_limit_inr: 10000
+    beneficiary_ids: [BOB-001]
+    status: ACTIVE
+
+beneficiaries:
+  - id: BOB-001
+    name: "Meera Sharma (fake)"
+    bank: "SYNTH-BANK"
+    external_account_ref: "SYN-EXT-9001"
+    verified: true
+  - id: BOB-002
+    name: "Jonas Weber (fake)"
+    bank: "SYNTH-BANK"
+    external_account_ref: "SYN-EXT-9002"
+    verified: false
+  - id: BOB-003
+    name: "Zara Khan (fake)"
+    bank: "FAKE-TRUST"
+    external_account_ref: "SYN-EXT-9003"
+    verified: true

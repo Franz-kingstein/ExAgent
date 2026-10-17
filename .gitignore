@@ -1,0 +1,23 @@
+# Environments
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Test / tooling caches
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# NOTE: generated synthetic datasets under data/ are intentionally committed
+# only when small and reproducible; bulk artifacts must be regenerated, not
+# committed. Add patterns below if generation output grows.
