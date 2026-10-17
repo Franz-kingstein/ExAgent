@@ -123,6 +123,26 @@ configs/requirements_bank.yaml   machine-readable requirement registry
   `beneficiaries_verified` so limits/verification are *trace evidence*, not
   hidden knowledge.
 
+## Behavior-deviation explainability (Phase 4, delivered)
+
+```
+explain/anomaly.py   TrajectoryAnomalyDetector (interpretable rules, no ML)
+explain/deviation.py DeviationExplainer -> DeviationExplanation (hybrid Q2)
+```
+
+- Hybrid: Phase 3 requirement assessments (reused, not duplicated) + rule-based
+  trajectory anomalies: UNEXPECTED_TOOL_CALL, UNEXPECTED_EVENT_ORDER,
+  MISSING_EXPECTED_EVENT, CONFLICTING_TOOL_RESULTS, REPEATED_FAILED_ACTION
+  (>=2 identical failures), EXCESSIVE_RETRY (>=3), INCONSISTENT_STATE_TRANSITION,
+  ACTION_INCONSISTENT_WITH_STATE.
+- Category answer to "what went wrong": NONE / REQUIREMENT_VIOLATION /
+  TRAJECTORY_ANOMALY / BOTH / INSUFFICIENT_EVIDENCE.
+- Association between anomalies and violations is labelled
+  `confirmed` (same tool call) / `possible` / `unknown` / `none` — explicitly
+  **never causal** ("No causal relationship is claimed").
+- Missing state (e.g. LLM traces) skips state checks instead of flagging:
+  absence of evidence is not evidence of anomaly.
+
 ## Phase plan
 
 See `docs/phases.md`.

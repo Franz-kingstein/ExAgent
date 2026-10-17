@@ -49,3 +49,74 @@ class DecisionExplanation(BaseModel):
     rationale: str = Field(description="Concise evidence-grounded rationale")
     method: str = "requirement_to_action_matching_v1"
     llm_used: bool = False
+
+
+# --------------------------------------------------------------------- Q2
+class AnomalyType(str, Enum):
+    """Interpretable trajectory anomaly types (rule-based detector)."""
+
+    UNEXPECTED_TOOL_CALL = "UNEXPECTED_TOOL_CALL"
+    UNEXPECTED_EVENT_ORDER = "UNEXPECTED_EVENT_ORDER"
+    MISSING_EXPECTED_EVENT = "MISSING_EXPECTED_EVENT"
+    CONFLICTING_TOOL_RESULTS = "CONFLICTING_TOOL_RESULTS"
+    REPEATED_FAILED_ACTION = "REPEATED_FAILED_ACTION"
+    EXCESSIVE_RETRY = "EXCESSIVE_RETRY"
+    INCONSISTENT_STATE_TRANSITION = "INCONSISTENT_STATE_TRANSITION"
+    ACTION_INCONSISTENT_WITH_STATE = "ACTION_INCONSISTENT_WITH_STATE"
+
+
+class Severity(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+class Anomaly(BaseModel):
+    """One detected trajectory anomaly, grounded in trace events."""
+
+    anomaly_id: str = Field(pattern=r"^ANOM-\d{4}$")
+    event_ids: list[str] = Field(min_length=1, description="Where in the trace it was detected")
+    anomaly_type: AnomalyType
+    evidence: list[EvidenceItem] = Field(default_factory=list)
+    severity: Severity
+    explanation: str
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class DeviationCategory(str, Enum):
+    """Top-level answer to 'what went wrong?'."""
+
+    NONE = "NONE"                                  # nothing detected
+    REQUIREMENT_VIOLATION = "REQUIREMENT_VIOLATION"  # (A)
+    TRAJECTORY_ANOMALY = "TRAJECTORY_ANOMALY"        # (B)
+    BOTH = "BOTH"                                    # (C)
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"  # (D)
+
+
+class RelationLabel(str, Enum):
+    """Association between anomalies and violations. Never a causal claim."""
+
+    NONE = "none"
+    CONFIRMED = "confirmed"   # same tool call in the trace
+    POSSIBLE = "possible"     # same trace, different locations
+    UNKNOWN = "unknown"       # cannot be determined from the evidence
+
+
+class DeviationExplanation(BaseModel):
+    """Q2 output: hybrid requirement-violation + trajectory-anomaly analysis."""
+
+    task_id: str
+    trace_id: str
+    task_text: str
+    agent_id: str
+    action: str
+    category: DeviationCategory
+    requirement_violations: list[RequirementAssessment] = Field(default_factory=list)
+    unknown_requirement_ids: list[str] = Field(
+        default_factory=list, description="Requirements that could not be assessed"
+    )
+    anomalies: list[Anomaly] = Field(default_factory=list)
+    relation: RelationLabel = RelationLabel.NONE
+    combined_explanation: str
+    method: str = "hybrid_requirement_and_trajectory_analysis_v1"
+    llm_used: bool = False

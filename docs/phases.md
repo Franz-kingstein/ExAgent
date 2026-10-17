@@ -15,13 +15,14 @@
       (`configs/requirements_bank.yaml`), deterministic requirement-to-action matcher,
       per-requirement assessments (SATISFIED/VIOLATED/UNKNOWN) with evidence
       citations, conflict reporting, concise rationale; 89 passing tests.
-- [ ] **Phase 4 — Q2 behavior-deviation explainability** *(recommended next)*:
-      trajectory anomaly detection over traces (unexpected sequences, missing steps,
-      outcome/state inconsistencies) + deviation explanations citing evidence.
-      Requirement-checking half of Q2 landed in Phase 3.
-- [ ] **Phase 5 — Q3 counterfactuals + Q4 validation**: alternative-action
-      comparison and controlled replay; evidence store, rule verifier,
-      guardrails, LLM/SLM judge (local Ollama), golden fixtures.
+- [x] **Phase 4 — Q2 behavior-deviation explainability**: interpretable trajectory
+      anomaly detector (8 rule-based signals), hybrid explainer combining Phase 3
+      requirement checking with anomalies, confirmed/possible/unknown association
+      labelling (no causal claims), 11 passing tests; 111 tests total.
+- [ ] **Phase 5 — Q3 counterfactual explainability** *(recommended next)*:
+      alternative-action comparison and controlled replay in the sandbox.
+- [ ] **Phase 6 — Q4 explanation validation**: evidence store + content hashing,
+      rule verifier, guardrails, LLM/SLM judge (local Ollama), golden fixtures.
 - [ ] **Phase 3 — Q2 Deviation**: hybrid requirement checking (hard/soft rules) +
       trajectory anomaly detection.
 - [ ] **Phase 4 — Q3 Counterfactual**: alternative-action enumeration, comparison,
