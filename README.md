@@ -25,9 +25,9 @@ researched on a **fully simulated banking agent with completely synthetic/fake f
 
 ## Status
 
-Phase 1 — simulated banking agent: done (rule-based deterministic agent +
-LangChain/Ollama LLM agent, 43 tests passing). Explanations, anomaly detection,
-counterfactuals, and judges are **not implemented yet**.
+Phase 2 — structured execution traces: done (trace schema, recorder, agent
+integration, committed sample trace; 73 tests passing). Explanations, anomaly
+detection, counterfactuals, and judges are **not implemented yet**.
 
 ## Quickstart
 
@@ -44,13 +44,13 @@ docs/        architecture, safety policy, phase plan
 configs/     bank_dataset.yaml (synthetic accounts), scenarios, judge prompts
 src/trace_xai/
   banking/       state.py · dataset.py · environment.py · results.py   (Phase 1 ✔)
+  core/          trace.py (schema) · recorder.py                       (Phase 2 ✔)
   agent/         parser.py · rule_agent.py · langchain_agent.py · langchain_tools.py (Phase 1 ✔)
-  core/          evidence spine: types, evidence store, claim labels   (Phase 2)
   requirements/  requirement registry + matching                        (Phase 2)
   explain/       Q1 decision, Q2 deviation, Q3 counterfactual           (Phase 2-4)
   validate/      Q4 verifier, guardrails, LLM/SLM judge                 (Phase 4)
   llm/           LLM client (local Ollama default, fully optional)
-data/        synthetic datasets, trajectories, requirements
-experiments/ phase1_demo.py and future paper artifacts
+data/        synthetic datasets, traces (sample_transfer_success.json), requirements
+experiments/ phase1_demo.py · phase2_sample_trace.py and future paper artifacts
 tests/       unit (deterministic) + integration (LLM, auto-skip)
 ```

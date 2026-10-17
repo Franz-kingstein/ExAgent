@@ -74,3 +74,16 @@ def test_llm_tool_results_are_structured_json(agent):
     last = result.tool_calls[-1].result
     assert isinstance(last, dict)
     assert "success" in last and "reason_code" in last
+
+
+def test_llm_agent_trace_records_null_state_honestly(agent, env):
+    """Through the tool loop the agent does not observe state: the trace must
+    record state_before/state_after as explicit nulls, never fabricated."""
+    _result, trace = agent.run_traced("What is the balance of account ACC-SYN-001?")
+    tool_events = [e for e in trace.events if e.event_type.value == "TOOL_RESULT"]
+    assert tool_events, "expected a TOOL_RESULT event"
+    for event in tool_events:
+        assert event.state_before is None and event.state_after is None
+        assert event.tool_output is not None  # tool output WAS observed
+    assert trace.events[0].event_type.value == "TASK_RECEIVED"
+    assert trace.final_outcome[0] is not None  # outcome recorded

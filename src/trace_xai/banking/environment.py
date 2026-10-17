@@ -68,6 +68,21 @@ class BankEnvironment:
         payload = json.dumps(self._state.model_dump(mode="json"), sort_keys=True)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+    def summary(self) -> dict:
+        """Compact, deterministic observable-state summary for traces.
+
+        This is what trace events record in state_before/state_after; it is
+        an *observation*, not a copy of the full state.
+        """
+        return {
+            "fingerprint": self.fingerprint(),
+            "balances": {
+                aid: acc.balance_inr for aid, acc in sorted(self._state.accounts.items())
+            },
+            "ledger_size": len(self._state.transactions),
+            "tx_counter": self._state.tx_counter,
+        }
+
     # ------------------------------------------------------------------ tools
     def get_balance(self, account_id: str | None = None) -> dict:
         account_id = account_id or self._default_account_id

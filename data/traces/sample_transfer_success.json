@@ -1,0 +1,141 @@
+{
+  "trace_id": "TRC-SYN-0001",
+  "task_id": "TASK-SYN-0001",
+  "task_text": "Transfer ₹10,000 to beneficiary BOB-001.",
+  "agent_id": "rule-based-agent",
+  "started_at": "2026-01-01T12:00:00Z",
+  "events": [
+    {
+      "event_id": "TRC-SYN-0001-E001",
+      "sequence": 1,
+      "timestamp": "2026-01-01T12:00:01Z",
+      "task_id": "TASK-SYN-0001",
+      "agent_id": "rule-based-agent",
+      "event_type": "TASK_RECEIVED",
+      "action": null,
+      "tool_name": null,
+      "tool_input": null,
+      "tool_output": null,
+      "state_before": null,
+      "state_after": null,
+      "requirement_reference": null,
+      "expected_outcome": null,
+      "actual_outcome": null,
+      "success": null,
+      "error": null,
+      "provenance": {
+        "source": "TASK",
+        "source_id": "rule-based-agent",
+        "synthetic": true
+      },
+      "related_event_id": null,
+      "conflict_with_event_id": null
+    },
+    {
+      "event_id": "TRC-SYN-0001-E002",
+      "sequence": 2,
+      "timestamp": "2026-01-01T12:00:02Z",
+      "task_id": "TASK-SYN-0001",
+      "agent_id": "rule-based-agent",
+      "event_type": "TOOL_INVOCATION",
+      "action": "TRANSFER",
+      "tool_name": "transfer",
+      "tool_input": {
+        "beneficiary_id": "BOB-001",
+        "amount_inr": 10000
+      },
+      "tool_output": null,
+      "state_before": {
+        "fingerprint": "9c6ad3028932a13c4c532b9b43ebfc5e1604a60f26738630fe7b1301cec2724c",
+        "balances": {
+          "ACC-SYN-001": 250000,
+          "ACC-SYN-002": 5000
+        },
+        "ledger_size": 0,
+        "tx_counter": 0
+      },
+      "state_after": null,
+      "requirement_reference": null,
+      "expected_outcome": null,
+      "actual_outcome": null,
+      "success": null,
+      "error": null,
+      "provenance": {
+        "source": "ENVIRONMENT",
+        "source_id": "transfer",
+        "synthetic": true
+      },
+      "related_event_id": null,
+      "conflict_with_event_id": null
+    },
+    {
+      "event_id": "TRC-SYN-0001-E003",
+      "sequence": 3,
+      "timestamp": "2026-01-01T12:00:03Z",
+      "task_id": "TASK-SYN-0001",
+      "agent_id": "rule-based-agent",
+      "event_type": "TOOL_RESULT",
+      "action": "TRANSFER",
+      "tool_name": "transfer",
+      "tool_input": null,
+      "tool_output": {
+        "success": true,
+        "reason_code": "OK",
+        "account_id": "ACC-SYN-001",
+        "beneficiary_id": "BOB-001",
+        "amount_inr": 10000,
+        "balance_inr": 240000,
+        "transaction_id": "TXN-SYN-0001"
+      },
+      "state_before": null,
+      "state_after": {
+        "fingerprint": "bfff211132b772951214355bece88f72ee9c1f7da1f8bc91242602623c494345",
+        "balances": {
+          "ACC-SYN-001": 240000,
+          "ACC-SYN-002": 5000
+        },
+        "ledger_size": 1,
+        "tx_counter": 1
+      },
+      "requirement_reference": null,
+      "expected_outcome": null,
+      "actual_outcome": null,
+      "success": true,
+      "error": null,
+      "provenance": {
+        "source": "ENVIRONMENT",
+        "source_id": "transfer",
+        "synthetic": true
+      },
+      "related_event_id": "TRC-SYN-0001-E002",
+      "conflict_with_event_id": null
+    },
+    {
+      "event_id": "TRC-SYN-0001-E004",
+      "sequence": 4,
+      "timestamp": "2026-01-01T12:00:04Z",
+      "task_id": "TASK-SYN-0001",
+      "agent_id": "rule-based-agent",
+      "event_type": "OUTCOME_RECORDED",
+      "action": null,
+      "tool_name": null,
+      "tool_input": null,
+      "tool_output": null,
+      "state_before": null,
+      "state_after": null,
+      "requirement_reference": null,
+      "expected_outcome": null,
+      "actual_outcome": "OK",
+      "success": true,
+      "error": null,
+      "provenance": {
+        "source": "AGENT",
+        "source_id": "rule-based-agent",
+        "synthetic": true
+      },
+      "related_event_id": null,
+      "conflict_with_event_id": null
+    }
+  ],
+  "synthetic": true
+}

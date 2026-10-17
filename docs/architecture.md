@@ -77,6 +77,29 @@ src/trace_xai/
 - `Explanation` — Q1–Q4 question, subject, claims, generator, `llm_used`
 - `Event` / `Step` / `Trajectory` — minimal trajectory spine (refined in Phase 2)
 
+## Execution-trace layer (Phase 2, delivered)
+
+```
+core/
+  trace.py      EventType, TraceEvent, ExecutionTrace, Provenance, ErrorInfo
+  recorder.py   ExecutionRecorder (single writer; ordering + IDs + logical clock)
+```
+
+- **Observable only**: no chain-of-thought, no fake "reasoning" fields.
+- **Honest nulls**: unobserved tool outputs, state, requirements, and expected
+  outcomes are JSON null — never defaults or placeholders.
+- **Conflicts representable**: multiple `TOOL_RESULT`s may link to one
+  `TOOL_INVOCATION`; contradicting results keep `conflict_with_event_id`.
+- **Deterministic**: logical-clock timestamps, `TRC-*-Ennn` ids; identical runs
+  produce byte-identical JSON.
+- Rule-agent traces capture `state_before`/`state_after` summaries via
+  `BankEnvironment.summary()`; LLM-agent traces honestly record state as null
+  (not observable through the LangChain tool loop).
+- Both agents expose `run_traced(task) -> (ExecutionResult, ExecutionTrace)`;
+  `run(task)` is unchanged.
+- Committed artifact: `data/traces/sample_transfer_success.json` — usable by
+  TRACE-XAI without re-running any agent.
+
 ## Phase plan
 
 See `docs/phases.md`.
