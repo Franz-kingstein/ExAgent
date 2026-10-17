@@ -26,13 +26,22 @@
       never blended with the traced execution), requirement comparison,
       improves/worsens impact labelling, uncertainty rubric; 15 passing tests;
       126 tests total.
-- [ ] **Phase 6 — Q4 explanation validation**: evidence store + content hashing,
-      rule verifier, guardrails, LLM/SLM judge (local Ollama), golden fixtures.
-- [ ] **Phase 7 — Controlled failures & robustness** *(optional)*: injected
+- [x] **Phase 6 — SLM rationale layer**: `rationale/` package — structured
+      prompt template (evidence packet, no CoT requests), replaceable provider
+      interface (local Ollama via raw API with `think: false`, isolated
+      OpenAI-compatible HTTP interface, test double), five-section
+      user-facing rationale with per-claim citation grounding
+      (prose + claims scanned; unresolvable ids quarantined), deterministic
+      non-LLM fallback (0.36 ms); 21 unit + 4 real-model integration tests;
+      151 tests total.
+- [ ] **Phase 7 — Q4 explanation validation** *(next)*: evidence store +
+      content hashing, rule verifier, guardrails, LLM/SLM judge, golden
+      fixtures.
+- [ ] **Phase 8 — Controlled failures & robustness** *(optional)*: injected
       anomalies for the deviation detector to explain.
 
 ## Open questions (tracked)
 
 - Semantic/embedding-based matching deferred: no local embedding model (disk budget).
-- Judge model choice: `qwen3.5:4b` default; compare against `llama3.2` in Phase 6.
-- Demo UI (FastAPI/Gradio) decision deferred until after Phase 6.
+- Judge model choice: `qwen3.5:4b` default; compare against `llama3.2` in Phase 7.
+- Demo UI (FastAPI/Gradio) decision deferred until after Phase 7.

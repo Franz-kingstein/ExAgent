@@ -178,6 +178,40 @@ banking/environment.py       restore_summary() for replay state reconstruction
 - Missing state ⇒ no minimal alternatives are generated and provided ones
   evaluate to UNKNOWN — evidence gaps are surfaced, never filled in.
 
+## SLM rationale layer (Phase 6, delivered)
+
+```
+rationale/context.py     RationaleContext — explicit evidence packet (Q1-Q3)
+rationale/template.py    structured system/user prompts (never asks for CoT)
+rationale/provider.py    RationaleProvider protocol
+                         ├── OllamaRationaleProvider  (local, think=false)
+                         ├── OpenAICompatProvider     (isolated HTTP, opt-in)
+                         └── EchoRationaleProvider    (test double)
+rationale/generator.py   RationaleGenerator -> StructuredRationale (five sections)
+rationale/models.py      ClaimLabel FACT|EVIDENCE|INFERENCE|UNKNOWN, RationaleClaim
+```
+
+- Research rule honored: the model is **not** asked to reveal reasoning. It
+  receives a pre-computed evidence packet (requirements, action, matching
+  results, deviations, anomalies, counterfactuals, evidence index, uncertainty,
+  provenance) and writes a user-facing communication — nothing to infer:
+  missing facts are rendered as explicit `UNKNOWN (not recorded)` lines.
+- Provider replaceability: the generator only sees
+  `generate(system, user) -> str`. Local Ollama is the default (raw HTTP API so
+  `think: false` is enforced — qwen3.5:4b otherwise exhausts its output budget
+  on hidden reasoning); external OpenAI-compatible endpoints sit behind one
+  isolated, opt-in class; with no provider the same five sections are composed
+  deterministically from the packet (`llm_used=False`, 0.36 ms).
+- Grounding, not judgment: every cited id in the model's claims **and in the
+  five section texts** must resolve to the packet (`E*`, `REQ-*`, `ANOM-*`,
+  `CF-*`). Unresolvable citations are quarantined in `unsupported_claims` and
+  the rationale is flagged `grounded=False` — visible, never silently trusted.
+  Semantic scoring of prose is Phase 7's judge (not implemented).
+- Output: five sections (decision rationale, deviation explanation,
+  counterfactual summary, evidence summary, uncertainty statement) + labelled
+  claims with evidence refs; `provenance.explain_layers_used_llm=False`
+  documents that Q1-Q3 themselves remain deterministic.
+
 ## Phase plan
 
 See `docs/phases.md`.
