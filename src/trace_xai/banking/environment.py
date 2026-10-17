@@ -83,12 +83,34 @@ class BankEnvironment:
             "per_txn_limits": {
                 aid: acc.per_txn_limit_inr for aid, acc in sorted(self._state.accounts.items())
             },
+            "account_status": {
+                aid: acc.status.value for aid, acc in sorted(self._state.accounts.items())
+            },
+            "linked_beneficiaries": {
+                aid: sorted(acc.beneficiary_ids) for aid, acc in sorted(self._state.accounts.items())
+            },
             "beneficiaries_verified": {
                 bid: b.verified for bid, b in sorted(self._state.beneficiaries.items())
             },
             "ledger_size": len(self._state.transactions),
             "tx_counter": self._state.tx_counter,
         }
+
+    def restore_summary(self, summary: dict) -> None:
+        """Restore decision-relevant state from a recorded trace summary.
+
+        Used ONLY for controlled counterfactual replay: balances and the
+        ledger counter are restored so an alternative action can be executed
+        against the exact pre-action money state. Full ledger history is not
+        reconstructed (documented as replay uncertainty).
+        """
+        for aid, value in (summary.get("balances") or {}).items():
+            account = self._state.accounts.get(aid)
+            if account is None:
+                raise KeyError(f"cannot restore unknown account {aid}")
+            account.balance_inr = int(value)
+        if summary.get("tx_counter") is not None:
+            self._state.tx_counter = int(summary["tx_counter"])
 
     # ------------------------------------------------------------------ tools
     def get_balance(self, account_id: str | None = None) -> dict:

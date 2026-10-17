@@ -19,21 +19,20 @@
       anomaly detector (8 rule-based signals), hybrid explainer combining Phase 3
       requirement checking with anomalies, confirmed/possible/unknown association
       labelling (no causal claims), 11 passing tests; 111 tests total.
-- [ ] **Phase 5 — Q3 counterfactual explainability** *(recommended next)*:
-      alternative-action comparison and controlled replay in the sandbox.
+- [x] **Phase 5 — Q3 counterfactual explainability**: minimal alternative-action
+      generation (clamp to binding constraint, verified-beneficiary switch),
+      deterministic sandbox simulation against recorded pre-action state,
+      controlled replay in an isolated environment clone (explicitly recorded,
+      never blended with the traced execution), requirement comparison,
+      improves/worsens impact labelling, uncertainty rubric; 15 passing tests;
+      126 tests total.
 - [ ] **Phase 6 — Q4 explanation validation**: evidence store + content hashing,
       rule verifier, guardrails, LLM/SLM judge (local Ollama), golden fixtures.
-- [ ] **Phase 3 — Q2 Deviation**: hybrid requirement checking (hard/soft rules) +
-      trajectory anomaly detection.
-- [ ] **Phase 4 — Q3 Counterfactual**: alternative-action enumeration, comparison,
-      controlled replay in the sandbox.
-- [ ] **Phase 5 — Q4 Validation + experiments**: rule verifier, guardrails,
-      LLM/SLM judge (local Ollama), golden fixtures, experiment notebooks.
-- [ ] **Phase 6 — Controlled failures & robustness**: injected anomalies for the
-      deviation detector to explain (planned, not started).
+- [ ] **Phase 7 — Controlled failures & robustness** *(optional)*: injected
+      anomalies for the deviation detector to explain.
 
 ## Open questions (tracked)
 
 - Semantic/embedding-based matching deferred: no local embedding model (disk budget).
-- Judge model choice: `qwen3.5:4b` default; compare against `llama3.2` in Phase 5.
-- Demo UI (FastAPI/Gradio) decision deferred until Phase 5.
+- Judge model choice: `qwen3.5:4b` default; compare against `llama3.2` in Phase 6.
+- Demo UI (FastAPI/Gradio) decision deferred until after Phase 6.

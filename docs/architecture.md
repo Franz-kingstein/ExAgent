@@ -143,6 +143,41 @@ explain/deviation.py DeviationExplainer -> DeviationExplanation (hybrid Q2)
 - Missing state (e.g. LLM traces) skips state checks instead of flagging:
   absence of evidence is not evidence of anomaly.
 
+## Counterfactual explainability (Phase 5, delivered)
+
+```
+explain/counterfactual.py
+  SandboxSimulator           deterministic what-if evaluation (no execution)
+  ControlledReplayEngine     executes the alternative in an isolated clone
+  CounterfactualExplainer    -> CounterfactualExplanation (Q3)
+explain/models.py            ActionSpec, PredictedOutcome, ReplayRecord,
+                             RequirementComparisonItem, Counterfactual
+banking/environment.py       restore_summary() for replay state reconstruction
+```
+
+- Two strictly separated levels: **simulation** (deterministic prediction
+  against the *recorded* pre-action state, `PredictedOutcome.basis =
+  deterministic_simulation`) and **controlled replay** (the alternative is
+  actually executed in a cloned `BankEnvironment` restored via
+  `restore_summary(state_before)`; result recorded in `ReplayRecord`). A
+  simulated alternative is never described as executed; when replay is
+  disabled/unavailable, `replay=None` and the explanation says "Not replayed:
+  prediction only, no execution claim is made."
+- Minimal-change generation only: clamp the amount to the binding constraint
+  (`min(per-transaction limit, available balance)`), or switch an unverified
+  beneficiary to a verified linked one. Unrelated alternatives are never
+  invented; externally supplied alternatives are evaluated the same way and
+  marked `source=provided`.
+- Requirement comparison reuses Phase 3 assessments of the actual trace
+  (never recomputed/duplicated) against the simulated alternative statuses;
+  `impact` labels improves / worsens / unchanged / unknown from the recorded
+  vs. predicted outcome.
+- Deterministic uncertainty rubric: base 0.05, +0.30 if any compared
+  requirement is UNKNOWN, +0.10 if not validated by replay, +0.10 if
+  beneficiary linkage was not observable (clamped to 1.0).
+- Missing state ⇒ no minimal alternatives are generated and provided ones
+  evaluate to UNKNOWN — evidence gaps are surfaced, never filled in.
+
 ## Phase plan
 
 See `docs/phases.md`.

@@ -55,6 +55,20 @@
           "ACC-SYN-001": 50000,
           "ACC-SYN-002": 10000
         },
+        "account_status": {
+          "ACC-SYN-001": "ACTIVE",
+          "ACC-SYN-002": "ACTIVE"
+        },
+        "linked_beneficiaries": {
+          "ACC-SYN-001": [
+            "BOB-001",
+            "BOB-002",
+            "BOB-003"
+          ],
+          "ACC-SYN-002": [
+            "BOB-001"
+          ]
+        },
         "beneficiaries_verified": {
           "BOB-001": true,
           "BOB-002": false,
@@ -106,6 +120,20 @@
         "per_txn_limits": {
           "ACC-SYN-001": 50000,
           "ACC-SYN-002": 10000
+        },
+        "account_status": {
+          "ACC-SYN-001": "ACTIVE",
+          "ACC-SYN-002": "ACTIVE"
+        },
+        "linked_beneficiaries": {
+          "ACC-SYN-001": [
+            "BOB-001",
+            "BOB-002",
+            "BOB-003"
+          ],
+          "ACC-SYN-002": [
+            "BOB-001"
+          ]
         },
         "beneficiaries_verified": {
           "BOB-001": true,

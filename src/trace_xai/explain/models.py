@@ -120,3 +120,86 @@ class DeviationExplanation(BaseModel):
     combined_explanation: str
     method: str = "hybrid_requirement_and_trajectory_analysis_v1"
     llm_used: bool = False
+
+
+# --------------------------------------------------------------------- Q3
+class ActionSpec(BaseModel):
+    """A (possibly hypothetical) banking action."""
+
+    tool: str = "transfer"
+    account_id: str | None = None
+    beneficiary_id: str | None = None
+    amount_inr: int | None = None
+
+
+class PredictedOutcome(BaseModel):
+    """Simulation result for an alternative action (never an executed claim)."""
+
+    success: bool | None = Field(default=None, description="Null if evidence insufficient")
+    reason_code: str | None = None
+    requirement_statuses: dict[str, RequirementStatus] = Field(default_factory=dict)
+    expected_state_change: str | None = None
+    basis: str = "deterministic_simulation"
+
+
+class ReplayRecord(BaseModel):
+    """Explicit record of a *controlled replay* in an isolated sandbox.
+
+    Present only when the alternative was actually executed; its execution is
+    separate from the traced execution and is never blended into it.
+    """
+
+    performed: bool
+    execution_success: bool | None = None
+    reason_code: str | None = None
+    state_change: dict | None = None
+    transaction_id: str | None = None
+    note: str
+
+
+class RequirementComparisonItem(BaseModel):
+    requirement_id: str
+    actual_status: RequirementStatus
+    alternative_status: RequirementStatus
+    changed: bool
+
+
+class CounterfactualImpact(str, Enum):
+    IMPROVES = "improves"
+    WORSENS = "worsens"
+    UNCHANGED = "unchanged"
+    UNKNOWN = "unknown"
+
+
+class Counterfactual(BaseModel):
+    cf_id: str = Field(pattern=r"^CF-\d{4}$")
+    source: str = Field(description="'generated_minimal' (minimal edit) or 'provided'")
+    original_action: ActionSpec
+    alternative_action: ActionSpec
+    changed_condition: str
+    predicted_outcome: PredictedOutcome
+    replay: ReplayRecord | None = Field(
+        default=None, description="Null when replay was not performed/available"
+    )
+    requirement_comparison: list[RequirementComparisonItem] = Field(default_factory=list)
+    evidence: list[EvidenceItem] = Field(default_factory=list)
+    impact: CounterfactualImpact = CounterfactualImpact.UNKNOWN
+    uncertainty: float = Field(ge=0.0, le=1.0)
+    explanation: str
+
+
+class CounterfactualExplanation(BaseModel):
+    """Q3 output: what could have happened under minimal alternative actions."""
+
+    task_id: str
+    trace_id: str
+    task_text: str
+    agent_id: str
+    action: str
+    actual_summary: str
+    counterfactuals: list[Counterfactual] = Field(default_factory=list)
+    notes: list[str] = Field(
+        default_factory=list, description="Generation/evaluation limitations"
+    )
+    method: str = "controlled_counterfactual_replay_v1"
+    llm_used: bool = False

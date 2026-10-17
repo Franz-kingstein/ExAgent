@@ -25,10 +25,12 @@ researched on a **fully simulated banking agent with completely synthetic/fake f
 
 ## Status
 
-Phase 4 — behavior-deviation explainability (Q2): done — hybrid of Phase 3
-requirement checking + interpretable trajectory anomaly detection, with
-confirmed/possible/unknown association labelling (no causal claims);
-111 tests passing. Counterfactuals and judges are **not implemented yet**.
+Phase 5 — counterfactual explainability (Q3): done — minimal alternative-action
+generation, deterministic sandbox simulation against recorded pre-action state,
+and controlled replay in an isolated environment clone (explicitly recorded,
+never blended with the traced execution); requirement comparison +
+improves/worsens impact labelling; 126 tests passing. The LLM judge and final
+explanation validator (Q4) are **not implemented yet**.
 
 ## Quickstart
 
@@ -48,10 +50,11 @@ src/trace_xai/
   agent/         parser.py · rule_agent.py · langchain_agent.py · langchain_tools.py (Phase 1 ✔)
   core/          trace.py (schema) · recorder.py                       (Phase 2 ✔)
   requirements/  model.py (registry + constraint types)                (Phase 3 ✔)
-  explain/       matcher.py · decision.py (Q1) · anomaly.py · deviation.py (Q2) (Phase 3-4 ✔)
-  validate/      Q4 verifier, guardrails, LLM/SLM judge                 (Phase 5)
+  explain/       matcher.py · decision.py (Q1) · anomaly.py · deviation.py (Q2)
+                 · counterfactual.py (Q3)                                 (Phase 3-5 ✔)
+  validate/      Q4 verifier, guardrails, LLM/SLM judge                 (Phase 6)
   llm/           LLM client (local Ollama default, fully optional)
 data/        synthetic datasets, traces (sample_transfer_success.json), requirements
-experiments/ phase1_demo.py · phase2_sample_trace.py · phase3_demo.py · phase4_demo.py
+experiments/ phase1_demo.py · phase2_sample_trace.py · phase3_demo.py · phase4_demo.py · phase5_demo.py
 tests/       unit (deterministic) + integration (LLM, auto-skip)
 ```
