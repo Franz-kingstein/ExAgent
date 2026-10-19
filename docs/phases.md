@@ -34,14 +34,20 @@
       (prose + claims scanned; unresolvable ids quarantined), deterministic
       non-LLM fallback (0.36 ms); 21 unit + 4 real-model integration tests;
       151 tests total.
-- [ ] **Phase 7 — Q4 explanation validation** *(next)*: evidence store +
-      content hashing, rule verifier, guardrails, LLM/SLM judge, golden
-      fixtures.
+- [x] **Phase 7 — Q4 explanation validation**: `validate/` package — claim
+      extraction (structured claims + citable sentences), evidence retrieval
+      from the Phase 6 packet, deterministic verification rules (limit/balance/
+      verification/outcome/requirement-status/asserted-number), lexical NLI
+      backstop (can only contradict), optional LLM-as-judge (semantic claims
+      only, confidence capped, never overrules rules), guardrail decisions
+      PASS/FLAG/BLOCK; 20 unit + 3 real-model integration tests; 174 tests
+      total.
 - [ ] **Phase 8 — Controlled failures & robustness** *(optional)*: injected
       anomalies for the deviation detector to explain.
 
 ## Open questions (tracked)
 
 - Semantic/embedding-based matching deferred: no local embedding model (disk budget).
-- Judge model choice: `qwen3.5:4b` default; compare against `llama3.2` in Phase 7.
-- Demo UI (FastAPI/Gradio) decision deferred until after Phase 7.
+- LLM judge shipped with `qwen3.5:4b`; a second judge model comparison
+  (e.g. `llama3.2`) remains open — judge verdicts are capped and advisory only.
+- Demo UI (FastAPI/Gradio) decision deferred until after Phase 8.

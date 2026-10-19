@@ -212,6 +212,37 @@ rationale/models.py      ClaimLabel FACT|EVIDENCE|INFERENCE|UNKNOWN, RationaleCl
   claims with evidence refs; `provenance.explain_layers_used_llm=False`
   documents that Q1-Q3 themselves remain deterministic.
 
+## Explanation validation (Phase 7, delivered)
+
+```
+validate/extract.py    claim extraction (claims array + citable sentences)
+validate/rules.py      deterministic rules + lexical NLI backstop
+validate/judge.py      LLM-as-judge (semantic claims only, optional)
+validate/validator.py  ExplanationValidator -> ValidationReport + guardrail
+validate/models.py     SUPPORTED/CONTRADICTED/UNKNOWN, PASS/FLAG/BLOCK
+```
+
+- Pipeline: claim extraction → evidence retrieval (from the Phase 6 packet)
+  → claim verification → per-claim verdict → guardrail decision.
+- Verification ladder, deterministic first:
+  1. **Deterministic rules** decide structured facts directly from cited
+     evidence operands: limit relation, balance relation, beneficiary
+     verification (missing value ⇒ UNKNOWN, never SUPPORTED), outcome +
+     reason-code equality (conflicting success values ⇒ UNKNOWN), recorded
+     requirement status, asserted-number equality.
+  2. **Lexical NLI backstop** — can only *contradict* (negation/antonym
+     clash), never supports.
+  3. **LLM-as-judge** — only for claims every deterministic method left
+     UNKNOWN; sees claim + verbatim cited evidence only; confidence capped at
+     0.75; SUPPORTED with zero evidence is forced back to UNKNOWN; never
+     overrules a deterministic verdict.
+- Guardrails: unresolvable/absent citations ⇒ UNKNOWN (never SUPPORTED);
+  any contradicted claim ⇒ BLOCK; unsupported-claim rate ≥ 0.5 ⇒ BLOCK;
+  unknowns ⇒ FLAG; Phase 6 `grounded=False` input can never PASS.
+- The validator judges, it never rewrites: reports list per-claim
+  evidence/method/confidence plus counts, unsupported-claim rate, overall
+  status, and the guardrail decision.
+
 ## Phase plan
 
 See `docs/phases.md`.
