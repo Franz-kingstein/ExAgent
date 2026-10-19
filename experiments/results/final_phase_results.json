@@ -1,0 +1,336 @@
+[
+  {
+    "experiment": "A_adaptive_presentation_consistency",
+    "method": "present_all() on each validated report; invariants compared across the four modes (status digest, requirement digest, evidence-ref digest, counts, guardrail) plus rendered-text equality checks",
+    "sample_size": {
+      "traces": 3,
+      "mode_views": 12
+    },
+    "all_invariants_hold": true,
+    "unknown_violations": 0,
+    "wording_varies": true,
+    "rows": [
+      {
+        "trace": "A_success",
+        "modes": 4,
+        "statuses_invariant": true,
+        "requirements_invariant": true,
+        "evidence_refs_invariant": true,
+        "counts_invariant": true,
+        "wording_differs": true,
+        "unknown_never_positive": true,
+        "evidence_accessible_every_mode": true
+      },
+      {
+        "trace": "B_violation",
+        "modes": 4,
+        "statuses_invariant": true,
+        "requirements_invariant": true,
+        "evidence_refs_invariant": true,
+        "counts_invariant": true,
+        "wording_differs": true,
+        "unknown_never_positive": true,
+        "evidence_accessible_every_mode": true
+      },
+      {
+        "trace": "D_both",
+        "modes": 4,
+        "statuses_invariant": true,
+        "requirements_invariant": true,
+        "evidence_refs_invariant": true,
+        "counts_invariant": true,
+        "wording_differs": true,
+        "unknown_never_positive": true,
+        "evidence_accessible_every_mode": true
+      }
+    ],
+    "limitations": [
+      "factual-consistency verification only; no human subjects were involved and no comprehension claim is made about any mode",
+      "mode wording is deterministic re-wording of validated content, not an adaptivity algorithm"
+    ]
+  },
+  {
+    "experiment": "B_evidence_validation_baseline_vs_full",
+    "method": "same adversarial rationale (3 injected claims with invented refs + 1 invented claim) run through a documented no-validation baseline and through the full TRACE-XAI validation stage; scored against synthetic ground truth known by construction",
+    "sample_size": {
+      "injected_wrong_claims": 3,
+      "invented_claims": 1,
+      "traces": 1
+    },
+    "baseline": {
+      "false_acceptance_rate": 1.0,
+      "detection_rate": 0.0,
+      "wrong_accepted": 3,
+      "model": "documented model of a no-validation pipeline: injected claims pass through unverified, so every wrong claim is accepted by construction"
+    },
+    "full_pipeline": {
+      "total_claims": 3,
+      "wrong_claims": 3,
+      "correct_claims": 0,
+      "wrong_detected": 3,
+      "wrong_accepted": 0,
+      "correct_supported": 0,
+      "missed_correct": 0,
+      "false_acceptance_rate": 0.0,
+      "detection_rate": 1.0,
+      "formula": "false_acceptance_rate = wrong_accepted / wrong_claims; detection_rate = wrong_detected / wrong_claims",
+      "notes": [
+        "all ground-truth claims were matched to a verdict",
+        "ground truth is synthetic and known by construction; no LLM judge serves as ground truth",
+        "CONTRADICTED and UNKNOWN both count as detected (neither is presented as verified); their split is visible in the raw verdicts"
+      ]
+    },
+    "improvement": {
+      "false_acceptance_rate_delta": 1.0,
+      "detection_rate_delta": 1.0
+    },
+    "invented_claim_quarantined": true,
+    "limitations": [
+      "the baseline is a documented model (claims pass through unverified), not a separately built second system",
+      "ground truth is synthetic and known by construction; no LLM judge serves as ground truth",
+      "CONTRADICTED and UNKNOWN both count as detected; their split is visible in the raw verdict counts",
+      "one adversarial provider pattern; other failure modes may differ"
+    ]
+  },
+  {
+    "experiment": "C_metric_evaluation",
+    "method": "report.metrics() per scenario; latency from perf_counter (ms), tokens provider-reported, claim-quality from validation verdicts; deterministic fallback rationale throughout (no model consulted)",
+    "sample_size": {
+      "scenarios": 5
+    },
+    "units": {
+      "latency": "ms",
+      "tokens": "count",
+      "cost": "USD",
+      "rates": "ratio 0-1",
+      "csat": "rating 1-5 (simulated)"
+    },
+    "rows": [
+      {
+        "scenario": "A_success",
+        "agent_execution_ms": 0.172,
+        "xai_analysis_ms": 0.776,
+        "end_to_end_ms": 0.948,
+        "latency_basis": "measured",
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cost_basis": "measured",
+        "estimated_cost_usd": 0.0,
+        "total_claims": 3,
+        "unsupported_claim_rate": 0.0,
+        "contradiction_rate": 0.0,
+        "unverifiable_rate": 0.0,
+        "simulated_csat": 5.0,
+        "csat_status": "NOT_COLLECTED"
+      },
+      {
+        "scenario": "B_violation",
+        "agent_execution_ms": 0.162,
+        "xai_analysis_ms": 2.72,
+        "end_to_end_ms": 2.882,
+        "latency_basis": "measured",
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cost_basis": "measured",
+        "estimated_cost_usd": 0.0,
+        "total_claims": 4,
+        "unsupported_claim_rate": 0.0,
+        "contradiction_rate": 0.0,
+        "unverifiable_rate": 0.0,
+        "simulated_csat": 5.0,
+        "csat_status": "NOT_COLLECTED"
+      },
+      {
+        "scenario": "D_both",
+        "agent_execution_ms": 0.163,
+        "xai_analysis_ms": 4.43,
+        "end_to_end_ms": 4.593,
+        "latency_basis": "measured",
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cost_basis": "measured",
+        "estimated_cost_usd": 0.0,
+        "total_claims": 4,
+        "unsupported_claim_rate": 0.0,
+        "contradiction_rate": 0.0,
+        "unverifiable_rate": 0.0,
+        "simulated_csat": 5.0,
+        "csat_status": "NOT_COLLECTED"
+      },
+      {
+        "scenario": "F_missing_evidence",
+        "xai_analysis_ms": 0.718,
+        "total_claims": 3,
+        "unsupported_claim_rate": 0.0,
+        "contradiction_rate": 0.0,
+        "unverifiable_rate": 0.0,
+        "unknown_requirements": 2
+      },
+      {
+        "scenario": "G_conflicting_evidence",
+        "xai_analysis_ms": 1.09,
+        "total_claims": 3,
+        "unsupported_claim_rate": 0.0,
+        "contradiction_rate": 0.0,
+        "unverifiable_rate": 0.0,
+        "unknown_requirements": 1
+      }
+    ],
+    "limitations": [
+      "deterministic fallback rationale: token counts are 0 and cost 0.00 USD by construction; the real-SLM path reports provider-measured tokens with cost UNKNOWN unless pricing is supplied",
+      "CSAT is simulated and labelled; no real user study exists",
+      "stage timings are single-run wall-clock measurements on this machine, not statistical estimates"
+    ]
+  },
+  {
+    "experiment": "D_post_action_stability",
+    "method": "PostActionStabilityMonitor with injected logical-clock timestamps; no real waiting; window length and observation span varied per case",
+    "sample_size": {
+      "cases": 7
+    },
+    "cases": [
+      {
+        "case": "clean_full_window_60s",
+        "window_ms": 60000,
+        "observe_ms": 60000,
+        "status": "NO_INTERVENTION_OBSERVED",
+        "ended_because": "WINDOW_ELAPSED",
+        "monitoring_duration_ms": 60000.0,
+        "observable_duration_ms": 60000.0,
+        "intervention_free_ms": null,
+        "intervention_count": 0,
+        "gap_count": 0
+      },
+      {
+        "case": "clean_full_window_10min",
+        "window_ms": 600000,
+        "observe_ms": 600000,
+        "status": "NO_INTERVENTION_OBSERVED",
+        "ended_because": "WINDOW_ELAPSED",
+        "monitoring_duration_ms": 600000.0,
+        "observable_duration_ms": 600000.0,
+        "intervention_free_ms": null,
+        "intervention_count": 0,
+        "gap_count": 0
+      },
+      {
+        "case": "intervention_at_25s",
+        "window_ms": 60000,
+        "observe_ms": 60000,
+        "status": "INTERVENTION_DETECTED",
+        "ended_because": "INTERVENTION_DETECTED",
+        "monitoring_duration_ms": 60000.0,
+        "observable_duration_ms": 60000.0,
+        "intervention_free_ms": 25000.0,
+        "intervention_count": 1,
+        "gap_count": 0
+      },
+      {
+        "case": "short_observation_20s_of_60s",
+        "window_ms": 60000,
+        "observe_ms": 20000,
+        "status": "INSUFFICIENT_OBSERVATION",
+        "ended_because": "OBSERVATION_CLOSED",
+        "monitoring_duration_ms": 20000.0,
+        "observable_duration_ms": 20000.0,
+        "intervention_free_ms": null,
+        "intervention_count": 0,
+        "gap_count": 0
+      },
+      {
+        "case": "interruption_gap_covers_window",
+        "window_ms": 60000,
+        "observe_ms": 60000,
+        "status": "INSUFFICIENT_OBSERVATION",
+        "ended_because": "OBSERVATION_CLOSED",
+        "monitoring_duration_ms": 60000.0,
+        "observable_duration_ms": 0.0,
+        "intervention_free_ms": null,
+        "intervention_count": 0,
+        "gap_count": 1
+      },
+      {
+        "case": "partial_gap_then_clean",
+        "window_ms": 60000,
+        "observe_ms": 60000,
+        "status": "INSUFFICIENT_OBSERVATION",
+        "ended_because": "OBSERVATION_CLOSED",
+        "monitoring_duration_ms": 60000.0,
+        "observable_duration_ms": 20000.0,
+        "intervention_free_ms": null,
+        "intervention_count": 0,
+        "gap_count": 1
+      },
+      {
+        "case": "intervention_after_window",
+        "window_ms": 60000,
+        "observe_ms": 120000,
+        "status": "NO_INTERVENTION_OBSERVED",
+        "ended_because": "WINDOW_ELAPSED",
+        "monitoring_duration_ms": 120000.0,
+        "observable_duration_ms": 120000.0,
+        "intervention_free_ms": null,
+        "intervention_count": 0,
+        "gap_count": 0
+      }
+    ],
+    "all_statuses_as_expected": true,
+    "late_event_excluded": true,
+    "limitations": [
+      "all interventions and gaps are simulated inputs on an injected clock; no real production monitoring occurred",
+      "NO_INTERVENTION_OBSERVED is bounded by the configured window and observed span \u2014 never a claim of indefinite stability or of correctness",
+      "interruption handling is interval-based; real outages may have irregular shapes"
+    ]
+  },
+  {
+    "experiment": "E_phase8_vs_extended",
+    "method": "same pipeline runs produce the Phase 8 15-section report and the extended views (4 presentation modes, metrics bundle, metric->trace linkage); core verdicts compared for identity, new artifacts counted",
+    "sample_size": {
+      "scenarios": 3,
+      "runs": 3
+    },
+    "rows": [
+      {
+        "scenario": "A_success",
+        "phase8_report_sections": 15,
+        "phase8_to_text_len": 4304,
+        "extended_artifacts": {
+          "presentation_modes": 4,
+          "metrics_sections": 4,
+          "linkage_chains": 1
+        },
+        "core_verdicts_identical_across_views": true,
+        "guardrail": "PASS"
+      },
+      {
+        "scenario": "B_violation",
+        "phase8_report_sections": 15,
+        "phase8_to_text_len": 4539,
+        "extended_artifacts": {
+          "presentation_modes": 4,
+          "metrics_sections": 4,
+          "linkage_chains": 1
+        },
+        "core_verdicts_identical_across_views": true,
+        "guardrail": "PASS"
+      },
+      {
+        "scenario": "D_both",
+        "phase8_report_sections": 15,
+        "phase8_to_text_len": 5186,
+        "extended_artifacts": {
+          "presentation_modes": 4,
+          "metrics_sections": 4,
+          "linkage_chains": 1
+        },
+        "core_verdicts_identical_across_views": true,
+        "guardrail": "PASS"
+      }
+    ],
+    "backwards_compatible": true,
+    "limitations": [
+      "comparison is structural (artifact inventory + verdict identity); no performance regression is asserted beyond the recorded stage timings",
+      "Phase 8 components were not modified; extended views are additive derivations from the same validated report"
+    ]
+  }
+]
