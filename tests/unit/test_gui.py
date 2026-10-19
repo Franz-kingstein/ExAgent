@@ -38,6 +38,14 @@ def state():
     return out[2]
 
 
+@pytest.fixture
+def pipeline_state():
+    """Scenario F: missing state_before -> requirement statuses UNKNOWN."""
+    out = gui.run_scenario("F — missing evidence (no state recorded)", "",
+                           gui._fresh_state())
+    return out[2]
+
+
 def _app():
     return gui.build_app()
 
@@ -107,14 +115,40 @@ class TestExplanationsAndEvidence:
             assert "✅" in digest and "❌" not in digest
         assert len(set(texts.values())) == 4      # wording really differs
 
+    def test_explanation_panel_is_markdown_not_text_artifacts(self, state):
+        """The UI panel must use headings/legend, not '-- title --' rows."""
+        for mode in gui.MODES:
+            text, _ = gui.explanation_view(mode, state)
+            for line in text.splitlines():
+                assert not line.startswith("-- "), \
+                    f"{mode}: plain-text separator leaked into the panel"
+            assert "### " in text
+            assert "How to read the tags" in text
+
+    def test_explanation_keeps_unknown_visible(self, pipeline_state):
+        """UNKNOWN claims must still be labelled UNKNOWN in the panel."""
+        text, _ = gui.explanation_view("eli5", pipeline_state)
+        assert "UNKNOWN" in text or "we cannot tell" in text \
+            or "nobody knows" in text
+
     def test_evidence_and_claims_tables_populated(self, state):
-        head, rows = gui.evidence_view(state)
+        head, index_rows, rows = gui.evidence_view(state)
         assert "Evidence index" in head and "never recomputed" in head
+        assert "local synthetic trace" in head          # provenance stated
+        assert index_rows and index_rows[0][0].startswith("E")
+        assert "=" in index_rows[0][1] or "state" in index_rows[0][1]
         assert rows
         for row in rows:
             assert row[1] in ("SUPPORTED", "CONTRADICTED", "UNKNOWN")
             assert row[3]                      # confidence rendered
             assert row[4]                      # evidence column present
+
+    def test_evidence_values_are_trace_derived_not_online(self, state):
+        """Every evidence ref must resolve to a value recorded in the trace."""
+        _, index_rows, _ = gui.evidence_view(state)
+        trace_ids = {e.event_id for e in state["trace"].events}
+        for ref, detail in index_rows:
+            assert any(tid in detail for tid in trace_ids), (ref, detail)
 
 
 # ------------------------------------------------------------- 4. metrics
@@ -242,6 +276,108 @@ class TestConsolidatedAndExport:
         txt, js, status = gui.export_files(gui._fresh_state())
         assert txt is None and js is None
         assert "Run a scenario first" in status
+
+
+# ------------------------------------------------ SLM toggle + PAS examples
+class TestSLMAndPASEnhancements:
+    def test_default_run_is_deterministic_fallback(self):
+        """use_slm=False (default) must report 0 tokens, honestly."""
+        out = gui.run_scenario(list(gui.SCENARIOS)[0], "",
+                               gui._fresh_state())
+        report = out[2]["report"]
+        assert report.llm_used is False
+        assert report.model_usage == []
+        assert "deterministic fallback" in out[0]
+
+    def test_slm_toggle_wires_provider_and_records_usage(self, monkeypatch):
+        """use_slm=True attaches a provider; its usage is recorded.
+
+        Uses a fake provider (deterministic, no network) — the real-Ollama
+        path is covered by tests/integration/test_gui_slm_llm.py.
+        """
+        class FakeSLM:
+            name = "fake-slm"
+            model = "fake-slm-1"
+            last_usage: dict = {}
+
+            def generate(self, system_prompt, user_prompt):
+                self.last_usage = {"prompt_eval_count": 120,
+                                   "eval_count": 45,
+                                   "total_duration_ns": 250_000_000,
+                                   "done_reason": "stop"}
+                return json.dumps({
+                    "decision_rationale":
+                        "The transfer amount 10000 exceeded nothing (E1).",
+                    "deviation_explanation": "No deviation recorded.",
+                    "counterfactual_summary": "A smaller amount would pass.",
+                    "evidence_summary": "Amount and limit recorded (E1, E2).",
+                    "uncertainty_statement": "Ledger history not rebuilt.",
+                    "claims": [{"text": "The requested amount was 10000.",
+                                "label": "FACT", "evidence_refs": ["E1"]}],
+                })
+
+        monkeypatch.setattr(gui, "_ollama_available", lambda: True)
+        monkeypatch.setattr(gui, "OllamaRationaleProvider",
+                            lambda **kw: FakeSLM())
+        out = gui.run_scenario(list(gui.SCENARIOS)[0], "",
+                               gui._fresh_state(), "normal", True)
+        report = out[2]["report"]
+        assert report.llm_used is True
+        assert report.model_usage, "provider usage must be recorded"
+        usage = report.model_usage[0]
+        assert usage.provider == "fake-slm"
+        assert usage.prompt_tokens == 120 and usage.completion_tokens == 45
+        assert "local SLM" in out[0]
+        # metrics carry the real token counts, cost stays honestly unknown
+        m = gui.metrics_view(out[2], False, 0, 0, False)
+        assert "**120**" in m and "**45**" in m
+        assert "no per-token price" in m or "unknown" in m
+
+    def test_slm_toggle_falls_back_honestly_when_daemon_down(self, monkeypatch):
+        """Unreachable daemon -> deterministic fallback + honest note."""
+        monkeypatch.setattr(gui, "_ollama_available", lambda: False)
+        out = gui.run_scenario(list(gui.SCENARIOS)[0], "",
+                               gui._fresh_state(), "normal", True)
+        report = out[2]["report"]
+        assert report.llm_used is False
+        assert "not reachable" in out[0]
+
+    def test_slm_provider_failure_falls_back_not_crashes(self, monkeypatch):
+        """A provider that raises must degrade to the fallback path."""
+        class BrokenSLM:
+            name = "broken-slm"
+            model = "broken-1"
+            last_usage: dict = {}
+
+            def generate(self, system_prompt, user_prompt):
+                from trace_xai.rationale.provider import ProviderError
+                raise ProviderError("simulated outage")
+
+        monkeypatch.setattr(gui, "_ollama_available", lambda: True)
+        monkeypatch.setattr(gui, "OllamaRationaleProvider",
+                            lambda **kw: BrokenSLM())
+        out = gui.run_scenario(list(gui.SCENARIOS)[0], "",
+                               gui._fresh_state(), "normal", True)
+        report = out[2]["report"]
+        assert report.llm_used is False
+        assert report.model_usage == []
+        assert report.validation is not None   # report still fully valid
+
+    def test_pas_example_constants_are_valid_json(self):
+        import json as _json
+        ev = _json.loads(gui.EXAMPLE_INTERVENTION)
+        gp = _json.loads(gui.EXAMPLE_GAP)
+        assert ev[0]["kind"] in gui.INTERVENTION_KINDS
+        assert {"start_ms", "end_ms"} <= set(gp[0])
+
+    def test_pas_examples_evaluate_end_to_end(self, state):
+        out = gui.pas_view(60000, 60000, gui.EXAMPLE_INTERVENTION,
+                           gui.EXAMPLE_GAP, state)
+        # the inserted intervention is detected, and the partial gap is
+        # still reported alongside it (conflicts surfaced, not hidden)
+        assert "INTERVENTION_DETECTED" in out
+        assert "observation gaps" in out
+        assert "collector offline" in out
 
 
 # ----------------------------------------------------- non-technical clarity

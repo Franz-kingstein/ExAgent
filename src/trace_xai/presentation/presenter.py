@@ -223,6 +223,81 @@ class PresentedExplanation(BaseModel):
                    "evidence and conclusions do not change")
         return "\n".join(out)
 
+    def to_markdown(self) -> str:
+        """Markdown rendering of the *same* items as ``to_text()``.
+
+        Presentation-only alternative for UI panels: real headings instead
+        of ``-- title --`` separators, and a legend for the epistemic tags.
+        Every status, claim text, evidence reference and count is the same
+        recorded value as in ``to_text()`` — this method re-renders, it never
+        recomputes (asserted by tests/unit/test_presentation.py).
+        """
+        out: list[str] = []
+        out.append(f"#### {self.mode.value.upper()} explanation — "
+                   f"{self.audience}")
+        out.append(self.description)
+        out.append("")
+        out.append(f"> {self.headline}")
+        out.append("")
+        out.append("**How to read the tags** — `FACT`: settled by the "
+                   "recorded evidence · `INFERENCE`: derived or predicted, "
+                   "not directly observed · `UNKNOWN`: not determinable "
+                   "from the recorded evidence (never upgraded to a fact).")
+
+        for block in self.blocks:
+            out.append("")
+            out.append(f"### {block.title}")
+            for line in block.lines:
+                out.append(f"- `{line.kind.value}` {line.text}")
+
+        if self.requirements:
+            out.append("")
+            out.append("### Requirements")
+            for r in self.requirements:
+                out.append(f"- `{r.kind.value}` **{r.requirement_id}** — "
+                           f"{r.status_text}: {r.requirement_text} "
+                           f"(confidence {r.confidence:.2f})")
+                if r.evidence:
+                    out.append(f"  - evidence: {'; '.join(r.evidence)}")
+                if r.conflicting:
+                    out.append(f"  - conflicting: {'; '.join(r.conflicting)}")
+
+        if self.claims:
+            out.append("")
+            out.append("### Verified claims")
+            for c in self.claims:
+                out.append(f"- `{c.status}` {c.claim}")
+                if c.evidence:
+                    out.append(f"  - evidence: {'; '.join(c.evidence)}")
+
+        out.append("")
+        out.append(f"### Evidence index ({len(self.evidence_index)} entries)")
+        for e in self.evidence_index:
+            out.append(f"- {e}")
+
+        out.append("")
+        out.append("### Validation")
+        out.append(f"- counts: {self.counts}")
+        out.append(f"- unsupported_claim_rate: "
+                   f"{self.unsupported_claim_rate:.3f}")
+        out.append(f"- overall: {self.overall_status} · guardrail: "
+                   f"{self.guardrail}")
+
+        if self.uncertainty:
+            out.append("")
+            out.append("### Uncertainty")
+            out.extend(f"- {u}" for u in self.uncertainty)
+        if self.limitations:
+            out.append("")
+            out.append("### Limitations")
+            out.extend(f"- {l}" for l in self.limitations)
+
+        out.append("")
+        out.append("---")
+        out.append("*synthetic data only · wording adapts to the audience; "
+                   "evidence and conclusions do not change*")
+        return "\n".join(out)
+
 
 # ------------------------------------------------------------ internals
 def _refs_in(text: str) -> set[str]:
@@ -304,12 +379,12 @@ _CLAIM_STATUS_WORD: dict[PresentationMode, dict[str, str]] = {
         "UNKNOWN": "not verifiable from the records",
     },
     PresentationMode.NORMAL: {
-        "SUPPORTED": "supported by the records",
+        "SUPPORTED": "the records back it up",
         "CONTRADICTED": "the records disagree with it",
         "UNKNOWN": "we cannot tell from the records",
     },
     PresentationMode.ELI5: {
-        "SUPPORTED": "backed up by the notes",
+        "SUPPORTED": "the notes back it up",
         "CONTRADICTED": "the notes say otherwise",
         "UNKNOWN": "the notes do not tell us",
     },
@@ -527,10 +602,10 @@ def present_report(report: "FinalXAIReport",
                         f"(verification: {word}).")
         elif mode is PresentationMode.NORMAL:
             rendered = (f"The explanation says: \"{verdict.claim}\" "
-                        f"— the records show it is {word}.")
+                        f"— {word}.")
         else:
             rendered = (f"We checked this sentence: \"{verdict.claim}\" "
-                        f"— the notes say it is {word}.")
+                        f"— {word}.")
         claims.append(PresentedClaim(
             claim=verdict.claim, rendered=rendered, status=status,
             method=verdict.verification_method.value,

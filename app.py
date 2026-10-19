@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import sys
 import tempfile
+import urllib.request
 from datetime import timedelta
 from pathlib import Path
 
@@ -37,6 +38,7 @@ from trace_xai.core.recorder import ExecutionRecorder
 from trace_xai.linkage import MetricChange, link_metric
 from trace_xai.metrics import CSATRecorder, ModelPricing
 from trace_xai.presentation import PresentationMode, present_all
+from trace_xai.rationale.provider import OllamaRationaleProvider
 from trace_xai.stability import (
     InterventionEvent,
     InterventionType,
@@ -158,6 +160,15 @@ SCENARIOS = {
 
 _EXPORT_DIR = Path(tempfile.gettempdir()) / "trace_xai_exports"
 
+# One-click examples for the After-Effects panel (simulated observation
+# data the evaluator can insert, edit and evaluate — clearly not system data)
+EXAMPLE_INTERVENTION = json.dumps(
+    [{"at_ms": 25000, "kind": "HUMAN_OVERRIDE",
+      "description": "operator reversed it"}], indent=2)
+EXAMPLE_GAP = json.dumps(
+    [{"start_ms": 0, "end_ms": 10000, "reason": "collector offline"}],
+    indent=2)
+
 
 def _fresh_state() -> dict:
     return {"report": None, "trace": None, "result": None,
@@ -165,11 +176,43 @@ def _fresh_state() -> dict:
 
 
 # ------------------------------------------------------------- handlers
+def _ollama_available() -> bool:
+    """Is the local Ollama daemon reachable? (checked before consulting it)"""
+    try:
+        urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
+        return True
+    except Exception:
+        return False
+
+
 def run_scenario(scenario_name: str, custom_task: str, state: dict,
-                 mode_name: str = "normal"):
-    """Run the selected scenario (or a custom task) and cache the report."""
+                 mode_name: str = "normal", use_slm: bool = False):
+    """Run the selected scenario (or a custom task) and cache the report.
+
+    ``use_slm`` consults the local Ollama model for the *rationale prose
+    only* (verdicts stay citation-grounded either way). When it is off — or
+    the daemon is unreachable — the deterministic fallback is used and the
+    metrics honestly report 0 tokens.
+    """
+    provider = None
+    slm_note = "- **Rationale source:** deterministic fallback (no model " \
+               "consulted) — token usage 0 by construction"
+    if use_slm:
+        if _ollama_available():
+            # shorter timeout than the library default: the GUI must not
+            # freeze for minutes on a cold model load — a timeout falls back
+            # to the deterministic path and says so
+            provider = OllamaRationaleProvider(timeout=90.0)
+            slm_note = ("- **Rationale source:** local SLM "
+                        f"(`{provider.name}`) — token usage below is "
+                        "provider-reported")
+        else:
+            slm_note = ("- **Rationale source:** deterministic fallback — "
+                        "local Ollama was not reachable, so no model was "
+                        "consulted (not an error)")
     pipeline = TraceXAIPipeline(
-        agent=RuleBasedAgent(BankEnvironment.from_dataset()))
+        agent=RuleBasedAgent(BankEnvironment.from_dataset()),
+        rationale_provider=provider)
     state = dict(_fresh_state())
     if custom_task.strip():
         result, report = pipeline.run(custom_task.strip())
@@ -190,6 +233,7 @@ def run_scenario(scenario_name: str, custom_task: str, state: dict,
         f"- **Requirements:** "
         + (", ".join(f"{k}={s}" for k, s
                      in report.requirement_satisfaction.items())),
+        slm_note,
     ]
     if custom_task.strip():
         summary.append("- *custom task; all data remains synthetic "
@@ -240,12 +284,10 @@ def explanation_view(mode: str, state: dict):
     presented = present_all(report)
     chosen = presented[PresentationMode(mode)]
     all_modes = present_report_digests(presented)
-    header = (f"### {mode.upper()} explanation — {chosen.audience}\n"
-              f"{chosen.description}\n\n"
-              f"**Cross-mode check (same validated report):** {all_modes}\n\n"
+    header = (f"**Cross-mode check (same validated report):** {all_modes}\n\n"
               f"Evidence, claim texts, statuses and counts are copied from "
               f"the validated report — only the wording changes.\n\n---\n")
-    return header + chosen.to_text(), all_modes
+    return header + chosen.to_markdown(), all_modes
 
 
 def present_report_digests(presented: dict) -> str:
@@ -259,19 +301,29 @@ def present_report_digests(presented: dict) -> str:
 
 
 def evidence_view(state: dict):
+    """Claims verdicts + the evidence index (the actual recorded values).
+
+    Evidence is derived 100% from the local synthetic trace — no online
+    lookups exist anywhere in this pipeline by design.
+    """
     report = state.get("report")
     if report is None:
-        return "Run a scenario first.", []
+        return "Run a scenario first.", [], []
     v = report.validation
-    header = (f"Evidence index ({len(report.evidence)} observed values). "
-              f"Each verified claim below cites the exact lines it rests on; "
-              f"verdicts are copied from the validation stage, never "
-              f"recomputed here.")
+    header = (f"Evidence index ({len(report.evidence)} observed values, "
+              f"listed below — all read from the local synthetic trace, "
+              f"never from an online source). Each verified claim cites the "
+              f"exact values it rests on; verdicts are copied from the "
+              f"validation stage, never recomputed here.")
+    index_rows = []
+    for line in report.evidence:
+        ref, _, detail = line.partition(" = ")
+        index_rows.append([ref, detail])
     rows = [[c.claim, c.verification_status.value,
              c.verification_method.value, f"{c.confidence:.2f}",
              " · ".join(c.evidence) or "(none cited)",
              c.explanation] for c in v.verifications]
-    return header, rows
+    return header, index_rows, rows
 
 
 def metrics_view(state: dict, use_pricing: bool, prompt_price: float,
@@ -302,7 +354,11 @@ def metrics_view(state: dict, use_pricing: bool, prompt_price: float,
         "", "### Cost", f"- {PLAIN['cost']}",
         f"- Tokens (prompt / completion): **{cost.total_prompt_tokens}** / "
         f"**{cost.total_completion_tokens}** — basis {basis(cost.basis)}",
-        f"- Estimated money cost: **{cost.estimated_cost_usd}** USD",
+        (f"- Estimated money cost: **{cost.estimated_cost_usd}** USD"
+         if cost.estimated_cost_usd is not None else
+         "- Estimated money cost: **unknown** — real tokens were used but "
+         "this model has no per-token price; supply pricing above to "
+         "estimate"),
         ("- Pricing supplied: " + cost.pricing_source) if cost.pricing_known
         else "- Pricing not supplied → cost reported as unknown, not guessed",
     ]
@@ -478,6 +534,11 @@ def build_app() -> gr.Blocks:
                 label="Or type your own task (synthetic sandbox)",
                 placeholder="Transfer ₹20,000 to beneficiary BOB-001.")
             run_btn = gr.Button("Run", variant="primary")
+            use_slm = gr.Checkbox(
+                label="Consult local SLM (Ollama qwen3.5:4b) for the "
+                      "rationale prose — records real provider token usage "
+                      "(verdicts stay citation-grounded either way)",
+                value=False)
             run_out = gr.Markdown()
             trace_head = gr.Markdown()
             trace_rows = gr.Dataframe(
@@ -500,6 +561,10 @@ def build_app() -> gr.Blocks:
 
         with gr.Tab("3 · Evidence & claims"):
             ev_head = gr.Markdown()
+            ev_index = gr.Dataframe(
+                label="Observed evidence values (from the local synthetic "
+                      "trace)",
+                headers=["ref", "recorded value"], interactive=False)
             claims = gr.Dataframe(
                 label="Verified claims (verdicts from the validation stage)",
                 headers=["claim", "status", "method", "confidence",
@@ -551,6 +616,10 @@ def build_app() -> gr.Blocks:
                 label='Observation gaps (JSON list, e.g. [{"start_ms": 0, '
                       '"end_ms": 10000, "reason": "collector offline"}])',
                 value="[]", lines=2)
+            with gr.Row():
+                ex_intervene = gr.Button("Insert example intervention")
+                ex_gap = gr.Button("Insert example gap")
+                ex_clear = gr.Button("Clear both")
             pas_btn = gr.Button("Evaluate After-Effects")
             pas_out = gr.Markdown()
 
@@ -583,13 +652,13 @@ def build_app() -> gr.Blocks:
             export_json = gr.File(label="JSON (report + 4 presentations + metrics)")
 
         run_btn.click(run_scenario,
-                      inputs=[scenario, custom, state, mode],
+                      inputs=[scenario, custom, state, mode, use_slm],
                       outputs=[run_out, trace_rows, state, expl_out,
                                expl_digest, pas_out])
         run_btn.click(trace_view, inputs=[state], outputs=[trace_head])
         # populate the other tabs from the fresh state after each run
         run_btn.click(evidence_view, inputs=[state],
-                      outputs=[ev_head, claims])
+                      outputs=[ev_head, ev_index, claims])
         run_btn.click(metrics_view,
                       inputs=[state, use_pricing, prompt_price,
                               completion_price, simulate],
@@ -610,6 +679,11 @@ def build_app() -> gr.Blocks:
                       inputs=[window_ms, observe_ms, events_json, gaps_json,
                               state],
                       outputs=[pas_out])
+        ex_intervene.click(lambda: EXAMPLE_INTERVENTION,
+                           outputs=[events_json])
+        ex_gap.click(lambda: EXAMPLE_GAP, outputs=[gaps_json])
+        ex_clear.click(lambda: ("[]", "[]"),
+                       outputs=[events_json, gaps_json])
         link_btn.click(linkage_view,
                        inputs=[link_metric_in, link_before, link_after,
                                link_scope, state],
@@ -624,7 +698,8 @@ def build_app() -> gr.Blocks:
                   inputs=[state, use_pricing, prompt_price, completion_price,
                           simulate],
                   outputs=[metrics_out])
-        demo.load(evidence_view, inputs=[state], outputs=[ev_head, claims])
+        demo.load(evidence_view, inputs=[state],
+                  outputs=[ev_head, ev_index, claims])
         demo.load(consolidated_view, inputs=[state], outputs=[report_out])
     return demo
 

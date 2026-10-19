@@ -244,6 +244,71 @@ class TestUnknownNeverSimplifiedAway:
                     assert row.kind is ClaimKind.FACT
 
 
+# ------------------------------------------- markdown rendering (UI panel)
+class TestMarkdownRendering:
+    """``to_markdown()`` re-renders the same recorded items as ``to_text()``.
+
+    It must never recompute a status, drop an UNKNOWN, or lose an evidence
+    reference — only the formatting differs (headings/legend vs separators).
+    """
+
+    def test_markdown_carries_same_statuses_as_text(self, violation_report):
+        for mode in MODES:
+            p = present_report(violation_report, mode)
+            md = p.to_markdown()
+            for claim, status in p.status_digest().items():
+                assert status in md, f"{mode}: claim status missing in md"
+                assert claim in md, f"{mode}: claim text missing in md"
+            # requirements: id + the audience wording of the recorded status
+            for row in p.requirements:
+                assert row.requirement_id in md
+                assert row.status_text in md
+            for ref in p.evidence_index[:3]:
+                assert ref in md, f"{mode}: evidence line missing in md"
+            # counts and rate appear in the markdown too
+            assert str(p.counts) in md
+            assert f"{p.unsupported_claim_rate:.3f}" in md
+
+    def test_markdown_has_no_text_separator_artifacts(self, violation_report):
+        for mode in MODES:
+            md = present_report(violation_report, mode).to_markdown()
+            # the '-- title --' plain-text separators must not leak into md
+            for line in md.splitlines():
+                assert not line.startswith("-- "), line
+            assert "### " in md           # real headings
+            assert "How to read the tags" in md
+
+    def test_markdown_keeps_unknown_as_unknown(self, pipeline):
+        """UNKNOWN must survive into the markdown with positive-free wording.
+
+        Note the two layers: a *requirement* with status UNKNOWN is rendered
+        with the audience wording for UNKNOWN; and a *claim* asserting that
+        same fact ("REQ-X: UNKNOWN — no observable evidence") may itself be
+        SUPPORTED, because the records do confirm the absence of evidence.
+        What must never happen is an UNKNOWN being worded as satisfied.
+        """
+        report = pipeline.analyze_execution(trace=_stateless_trace())
+        banned = ("SATISFIED", "the rule was followed", "backed by the "
+                  "records", "the records back it up")
+        for mode in MODES:
+            p = present_report(report, mode)
+            md = p.to_markdown()
+            unknown_reqs = [r for r in p.requirements if r.status == "UNKNOWN"]
+            assert unknown_reqs, mode
+            for r in unknown_reqs:
+                assert r.requirement_id in md
+                # the audience wording for UNKNOWN, never a positive word
+                assert r.status_text in md
+                for word in banned:
+                    assert word not in r.status_text, (mode, r.status_text)
+            # a claim whose verdict IS unknown must never render positively
+            for c in p.claims:
+                if c.status == "UNKNOWN":
+                    for word in ("back it up", "backed", "satisfied",
+                                 "compliant"):
+                        assert word not in c.rendered, (mode, c.rendered)
+
+
 # -------------------------------------------------- facts vs inference tagging
 class TestFactsVersusInferences:
     def test_action_lines_are_facts(self, violation_report):
