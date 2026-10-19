@@ -86,9 +86,11 @@ class TestScenarioA_SuccessfulAction:
         again = pipeline.analyze_execution(task_id=first.task_id)
         assert again.trace_id == first.trace_id
         # re-analysis of the same trace is deterministic; only the wall-clock
-        # stage timings legitimately differ between passes
+        # measurements (stage timings, agent execution time) legitimately
+        # differ between passes
         a, b = first.model_dump(), again.model_dump()
-        a.pop("timings_ms"), b.pop("timings_ms")
+        for key in ("timings_ms", "agent_execution_ms"):
+            a.pop(key), b.pop(key)
         assert a == b
 
     def test_one_call_helper(self):
@@ -375,6 +377,6 @@ class TestPipelineDeterminism:
             "Transfer ₹75,000 to beneficiary BOB-001.",
             agent=RuleBasedAgent(BankEnvironment.from_dataset()))
         a, b = r1.model_dump(), r2.model_dump()
-        for key in ("task_id", "trace_id", "timings_ms"):
+        for key in ("task_id", "trace_id", "timings_ms", "agent_execution_ms"):
             a.pop(key), b.pop(key)
         assert a == b

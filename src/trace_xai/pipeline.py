@@ -37,6 +37,7 @@ from .explain.models import (
     RequirementStatus,
 )
 from .banking.results import ExecutionResult
+from .metrics.models import TokenUsage
 from .rationale.context import RationaleContext, build_context
 from .rationale.generator import RationaleGenerator
 from .rationale.models import StructuredRationale
@@ -109,6 +110,15 @@ class FinalXAIReport(BaseModel):
 
     # --- pipeline metadata
     timings_ms: dict[str, float] = Field(default_factory=dict)
+    agent_execution_ms: float | None = Field(
+        default=None,
+        description="wall-clock ms the agent itself took (None = not timed "
+                    "in this call; UNKNOWN, never assumed zero)",
+    )
+    model_usage: list[TokenUsage] = Field(
+        default_factory=list,
+        description="provider-reported token usage for model-backed stages",
+    )
     llm_used: bool = Field(
         default=False, description="True if any stage consulted a model"
     )
@@ -130,6 +140,19 @@ class FinalXAIReport(BaseModel):
         from .presentation import present_all
 
         return present_all(self)
+
+    def metrics(self, pricing=None, simulate_csat: bool = False, csat=None):
+        """Derived metric view (latency / cost / claim quality / CSAT).
+
+        Pure function of data already recorded on this report — stage
+        timings, provider token usage, validation verdicts. Every metric
+        carries its unit and basis (measured / estimated / simulated /
+        unknown); see metrics/models.py for the exact formulas.
+        """
+        from .metrics import collect_metrics
+
+        return collect_metrics(self, pricing=pricing,
+                               simulate_csat=simulate_csat, csat=csat)
 
     def to_text(self) -> str:
         """Human-readable final report with the 15 numbered sections."""
@@ -197,6 +220,8 @@ class TraceXAIPipeline:
         )
         self._rationale = RationaleGenerator(provider=rationale_provider)
         self._validator = ExplanationValidator(judge_provider=judge_provider)
+        self._rationale_provider = rationale_provider
+        self._judge_provider = judge_provider
         self._traces: dict[str, ExecutionTrace] = {}
         self._reports: dict[str, FinalXAIReport] = {}
 
@@ -206,13 +231,22 @@ class TraceXAIPipeline:
         if self._agent is None:
             raise RuntimeError("no agent configured; pass a trace to "
                                "analyze_execution() instead")
+        t0 = time.perf_counter()
         result, trace = self._agent.run_traced(task)
-        return result, self.analyze_execution(trace=trace)
+        agent_ms = round((time.perf_counter() - t0) * 1000, 3)
+        report = self.analyze_execution(trace=trace,
+                                        agent_execution_ms=agent_ms)
+        return result, report
 
     def analyze_execution(
-        self, task_id: str | None = None, trace: ExecutionTrace | None = None
+        self, task_id: str | None = None, trace: ExecutionTrace | None = None,
+        agent_execution_ms: float | None = None,
     ) -> FinalXAIReport:
-        """Single-call analysis: task_id of a previously run task, or a trace."""
+        """Single-call analysis: task_id of a previously run task, or a trace.
+
+        ``agent_execution_ms`` is supplied by ``run()``; when a trace is
+        analyzed directly the agent latency stays UNKNOWN (None), never 0.
+        """
         if trace is None:
             if task_id is None:
                 raise ValueError("provide task_id or trace")
@@ -244,8 +278,11 @@ class TraceXAIPipeline:
         with stage("validation"):
             validation = self._validator.validate(rationale, context)
 
+        usage = self._usage_snapshot(rationale, validation)
         report = self._assemble(trace, context, decision, deviation,
-                                counterfactual, rationale, validation, timings)
+                                counterfactual, rationale, validation, timings,
+                                agent_execution_ms=agent_execution_ms,
+                                model_usage=usage)
         self._traces[trace.task_id] = trace
         self._reports[trace.task_id] = report
         return report
@@ -256,11 +293,47 @@ class TraceXAIPipeline:
         return self._reports[task_id]
 
     # ---------------------------------------------------------- internals
+    def _usage_snapshot(self, rationale: StructuredRationale,
+                        validation: ValidationReport) -> list[TokenUsage]:
+        """Provider-reported token usage for stages that really called a model.
+
+        Only stages that used a model contribute; deterministic fallbacks
+        report no usage (their cost is 0 by construction, not by estimate).
+        Providers without usage stats (test doubles) contribute nothing.
+        """
+        out: list[TokenUsage] = []
+        if rationale.llm_used:
+            u = self._usage_of(self._rationale_provider, "rationale")
+            if u is not None:
+                out.append(u)
+        if validation.judge_used:
+            u = self._usage_of(self._judge_provider, "judge")
+            if u is not None:
+                out.append(u)
+        return out
+
+    @staticmethod
+    def _usage_of(provider, stage: str) -> TokenUsage | None:
+        raw = getattr(provider, "last_usage", None)
+        if not raw:
+            return None
+        duration_ns = raw.get("total_duration_ns")
+        return TokenUsage(
+            stage=stage,
+            provider=getattr(provider, "name", "unknown"),
+            model=getattr(provider, "model", None),
+            prompt_tokens=raw.get("prompt_eval_count"),
+            completion_tokens=raw.get("eval_count"),
+            duration_ms=round(duration_ns / 1e6, 3) if duration_ns else None,
+        )
+
     @staticmethod
     def _assemble(trace, context: RationaleContext, decision, deviation,
                   counterfactual, rationale: StructuredRationale,
                   validation: ValidationReport,
-                  timings: dict[str, float]) -> FinalXAIReport:
+                  timings: dict[str, float],
+                  agent_execution_ms: float | None = None,
+                  model_usage: list[TokenUsage] | None = None) -> FinalXAIReport:
         by_status: dict[VerificationStatus, list[str]] = {
             VerificationStatus.SUPPORTED: [],
             VerificationStatus.CONTRADICTED: [],
@@ -295,6 +368,8 @@ class TraceXAIPipeline:
             decision=decision, deviation=deviation,
             counterfactual_explanation=counterfactual, rationale=rationale,
             timings_ms=timings,
+            agent_execution_ms=agent_execution_ms,
+            model_usage=model_usage or [],
             llm_used=rationale.llm_used or validation.judge_used,
         )
 
