@@ -165,7 +165,8 @@ def _fresh_state() -> dict:
 
 
 # ------------------------------------------------------------- handlers
-def run_scenario(scenario_name: str, custom_task: str, state: dict):
+def run_scenario(scenario_name: str, custom_task: str, state: dict,
+                 mode_name: str = "normal"):
     """Run the selected scenario (or a custom task) and cache the report."""
     pipeline = TraceXAIPipeline(
         agent=RuleBasedAgent(BankEnvironment.from_dataset()))
@@ -193,8 +194,14 @@ def run_scenario(scenario_name: str, custom_task: str, state: dict):
     if custom_task.strip():
         summary.append("- *custom task; all data remains synthetic "
                        "(local sandbox, no external calls)*")
+    # fill the downstream panels from the new state directly, so every tab
+    # has real content the moment the run completes (no empty outputs)
+    expl_text, expl_digest = explanation_view(mode_name, state)
+    pas_msg = ("Run complete. Enter simulated observation data "
+               "(interventions / gaps) below and press "
+               "'Evaluate After-Effects'.")
     return ("\n".join(summary), _trace_rows(trace), state,
-            gr.update(interactive=True), gr.update(interactive=True))
+            expl_text, expl_digest, pas_msg)
 
 
 def _trace_rows(trace) -> list[list]:
@@ -212,16 +219,17 @@ def _trace_rows(trace) -> list[list]:
     return rows
 
 
-def trace_view(state: dict):
+def trace_view(state: dict) -> str:
+    """Plain-language trace header (the event table comes from the run)."""
     trace = state.get("trace")
     if trace is None:
-        return "Run a scenario first.", []
+        return "Run a scenario first."
     lines = [f"Trace **{trace.trace_id}** (task {trace.task_id}) — "
              f"{len(trace.events)} recorded events, agent "
              f"`{trace.agent_id}`.", "",
              "Every value below was observed in the local synthetic "
              "sandbox; nothing is inferred at this layer."]
-    return "\n".join(lines), _trace_rows(trace)
+    return "\n".join(lines)
 
 
 def explanation_view(mode: str, state: dict):
@@ -486,6 +494,8 @@ def build_app() -> gr.Blocks:
                 "by simplifying.")
             mode = gr.Radio(choices=MODES, value="normal",
                             label="Explanation mode")
+            expl_digest = gr.Markdown(
+                value="Run a scenario to see the cross-mode invariance check.")
             expl_out = gr.Markdown()
 
         with gr.Tab("3 · Evidence & claims"):
@@ -573,8 +583,9 @@ def build_app() -> gr.Blocks:
             export_json = gr.File(label="JSON (report + 4 presentations + metrics)")
 
         run_btn.click(run_scenario,
-                      inputs=[scenario, custom, state],
-                      outputs=[run_out, trace_rows, state, expl_out, pas_out])
+                      inputs=[scenario, custom, state, mode],
+                      outputs=[run_out, trace_rows, state, expl_out,
+                               expl_digest, pas_out])
         run_btn.click(trace_view, inputs=[state], outputs=[trace_head])
         # populate the other tabs from the fresh state after each run
         run_btn.click(evidence_view, inputs=[state],
@@ -585,7 +596,8 @@ def build_app() -> gr.Blocks:
                       outputs=[metrics_out])
         run_btn.click(consolidated_view, inputs=[state],
                       outputs=[report_out])
-        mode.change(explanation_view, inputs=[mode, state], outputs=[expl_out])
+        mode.change(explanation_view, inputs=[mode, state],
+                    outputs=[expl_out, expl_digest])
         rate_btn.click(csat_record, inputs=[rating, state],
                        outputs=[csat_out, state])
         for component in (use_pricing, prompt_price, completion_price,

@@ -9,9 +9,13 @@ scenario run. Checks:
 - metrics display units and measured/estimated/simulated/unknown basis;
 - CSAT: only explicitly recorded ratings appear as real; simulation labelled;
 - After-Effects works on injected inputs and reports errors honestly;
-- export writes genuine text/JSON files carrying report + modes + metrics.
+- export writes genuine text/JSON files carrying report + modes + metrics;
+- ``TestGradioWiring`` drives every wired event through Gradio's real
+  postprocess layer, so handler/output arity or type mismatches (e.g. a
+  tuple handed to a Markdown) fail as tests instead of at click-time.
 """
 
+import asyncio
 import json
 import os
 import sys
@@ -20,6 +24,9 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+import gradio as gr  # noqa: E402
+from gradio.state_holder import SessionState  # noqa: E402
 
 import app as gui  # noqa: E402
 
@@ -58,7 +65,8 @@ class TestRunAndTrace:
             assert out[2]["report"] is not None, name
             assert "Guardrail" in out[0], name
             assert len(out[1]) >= 4, name            # trace rows
-            assert out[3]["interactive"] is True     # tabs unlocked
+            assert "explanation" in out[3].lower(), name   # expl panel filled
+            assert "Run complete" in out[5], name          # PAS prompt shown
 
     def test_custom_task_runs_in_synthetic_sandbox(self):
         s = gui._fresh_state()
@@ -67,14 +75,20 @@ class TestRunAndTrace:
         assert "₹20,000" in out[0]
         assert "synthetic" in out[0]
 
+    def test_run_honours_selected_mode(self):
+        s = gui._fresh_state()
+        out = gui.run_scenario(list(gui.SCENARIOS)[0], "", s, "eli5")
+        assert "ELI5 explanation" in out[3]
+
     def test_trace_view_labels_observed_data(self, state):
-        head, rows = gui.trace_view(state)
+        head = gui.trace_view(state)
         assert "observed" in head and "inferred" in head
+        rows = gui._trace_rows(state["trace"])
         assert rows and rows[0][0] == 1              # sequence starts at 1
 
     def test_empty_state_is_guided_not_crashing(self):
         empty = gui._fresh_state()
-        assert "Run a scenario first" in gui.trace_view(empty)[0]
+        assert "Run a scenario first" in gui.trace_view(empty)
         assert "Run a scenario first" in gui.evidence_view(empty)[0]
         assert "Run a scenario first" in gui.explanation_view("eli5", empty)[0]
         assert "Run a scenario first" in gui.metrics_view(empty, False, 0, 0,
@@ -243,3 +257,83 @@ class TestNonTechnicalClarity:
         out = gui.pas_view(60000, 60000, "[]", "[]", state)
         assert "never claims the action was correct" in out \
             or "not proof" in out
+
+
+# ------------------------------------------- runtime wiring (postprocess)
+def _sample_value(component, state):
+    """A plausible input value for a wired component."""
+    if isinstance(component, gr.State):
+        return state
+    if isinstance(component, (gr.Dropdown, gr.Radio)):
+        return component.value
+    if isinstance(component, gr.Checkbox):
+        return bool(component.value)
+    if isinstance(component, gr.Number):
+        return component.value if component.value is not None else 0.0
+    if isinstance(component, gr.Slider):
+        return component.value
+    if isinstance(component, gr.Textbox):
+        return component.value or ""
+    return component.value
+
+
+class TestGradioWiring:
+    """Drive every wired event through Gradio's real postprocess layer.
+
+    Handler-level tests call functions directly and can't see a mismatch
+    between what a handler returns and what its wired outputs expect (e.g. a
+    2-tuple handed to a single Markdown, or ``gr.update(interactive=True)``
+    applied to a Markdown). Those only fail inside Gradio's postprocess — at
+    click-time, for the user. This test runs every dependency through
+    ``Blocks.postprocess_data``, the exact code path Gradio uses.
+    """
+
+    def _populated_state(self):
+        out = gui.run_scenario(list(gui.SCENARIOS)[1], "",
+                               gui._fresh_state())   # scenario B
+        return out[2]
+
+    def test_every_dependency_postprocesses_cleanly(self):
+        demo = _app()
+        state = self._populated_state()
+        ran = 0
+        for block_fn in demo.fns.values():
+            if block_fn.fn is None:
+                continue
+            inputs = [_sample_value(c, state) for c in block_fn.inputs]
+            result = block_fn.fn(*inputs)
+            outputs = block_fn.outputs
+            if len(outputs) > 1:
+                assert isinstance(result, (tuple, list)) and \
+                    len(result) == len(outputs), \
+                    f"{getattr(block_fn.fn, '__name__', block_fn.fn)} returns " \
+                    f"{len(result) if isinstance(result, (tuple, list)) else 1} " \
+                    f"value(s) but is wired to {len(outputs)} outputs"
+            # the real Gradio layer: type mismatches raise here, as at runtime
+            processed = asyncio.run(
+                demo.postprocess_data(block_fn, result, SessionState(demo)))
+            assert len(processed) == len(outputs)
+            ran += 1
+        assert ran >= 15, f"only {ran} dependencies exercised"
+
+    def test_postprocess_layer_would_catch_the_tuple_bug(self):
+        """Guard: prove the harness fails on the historical bug shapes."""
+        demo = _app()
+        state = self._populated_state()
+        bf = next(b for b in demo.fns.values()
+                  if getattr(b.fn, "__name__", "") == "trace_view")
+        assert len(bf.outputs) == 1
+        with pytest.raises(AttributeError):
+            # the shipped bug: a 2-tuple into a single Markdown
+            asyncio.run(demo.postprocess_data(bf, ("head", ["row"]),
+                                              SessionState(demo)))
+
+    def test_postprocess_layer_would_catch_the_interactive_update(self):
+        """Guard: the other shipped bug — update dict into a Markdown."""
+        demo = _app()
+        state = self._populated_state()
+        bf = next(b for b in demo.fns.values()
+                  if getattr(b.fn, "__name__", "") == "trace_view")
+        with pytest.raises(TypeError):
+            asyncio.run(demo.postprocess_data(bf, gr.update(interactive=True),
+                                              SessionState(demo)))
