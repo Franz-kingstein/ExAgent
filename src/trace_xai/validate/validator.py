@@ -137,7 +137,7 @@ class ExplanationValidator:
 
         # 1-2. deterministic rules (preferred)
         ops = extract_operands(evidence_values)
-        hit = run_rules(claim.text, ops, req_statuses)
+        hit = run_rules(claim.text, ops, req_statuses, evidence_lines)
         if hit is not None:
             return ClaimVerification(
                 claim=claim.text, evidence=evidence_lines,

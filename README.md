@@ -25,13 +25,13 @@ researched on a **fully simulated banking agent with completely synthetic/fake f
 
 ## Status
 
-Phase 7 — explanation validation (Q4): done — claim extraction, evidence
-retrieval, deterministic verification rules with a lexical NLI backstop and
-an optional capped LLM-as-judge, guardrail decisions (PASS/FLAG/BLOCK);
-deliberately wrong explanations are caught (both spec examples verified:
-missing verification evidence ⇒ UNKNOWN, "within the ₹50,000 limit" vs
-₹75,000/₹50,000 ⇒ CONTRADICTED); 174 tests passing. All four research
-questions Q1–Q4 are now implemented.
+Phase 8 — integrated pipeline: done — `TraceXAIPipeline` composes all
+validated Q1–Q4 components behind a single call
+(`analyze_execution(task_id)`) and returns a 15-section `FinalXAIReport`
+with per-stage timings, embedded sub-reports, and computed limitations;
+9 end-to-end scenarios (success, violation, anomaly, combined, counterfactual,
+missing/conflicting evidence, unsupported vs correct explanations);
+189 tests passing. All four research questions Q1–Q4 are implemented.
 
 ## Quickstart
 
@@ -39,6 +39,29 @@ questions Q1–Q4 are now implemented.
 cd /home/franz/Documents/TRACE-XAI
 uv venv --system-site-packages --python /usr/bin/python3.11 .venv   # already done
 .venv/bin/python -m pytest                                          # run the test suite
+```
+
+One call from task to final XAI report:
+
+```python
+from trace_xai import analyze_execution          # or TraceXAIPipeline for reuse
+report = analyze_execution("Transfer ₹10,000 to beneficiary BOB-001.")
+print(report.to_text())                          # 15-section final report
+report.validation.guardrail_decision             # PASS / FLAG / BLOCK
+report.requirement_satisfaction                  # {'REQ-AMT-001': 'SATISFIED', ...}
+```
+
+With the real local SLM for the rationale text (needs the Ollama service;
+verdicts stay deterministic either way):
+
+```python
+from trace_xai import TraceXAIPipeline
+from trace_xai.agent.rule_agent import RuleBasedAgent
+from trace_xai.rationale.provider import OllamaRationaleProvider
+pipeline = TraceXAIPipeline(agent=RuleBasedAgent(),
+                            rationale_provider=OllamaRationaleProvider())
+result, report = pipeline.run("Transfer ₹10,000 to beneficiary BOB-001.")
+report = pipeline.analyze_execution(task_id=report.task_id)   # single-call API
 ```
 
 ## Layout
@@ -55,7 +78,8 @@ src/trace_xai/
                  · counterfactual.py (Q3)                                 (Phase 3-5 ✔)
   rationale/     context.py · template.py · provider.py · generator.py   (Phase 6 ✔)
   validate/      extract.py · rules.py · judge.py · validator.py         (Phase 7 ✔)
+  pipeline.py    TraceXAIPipeline -> FinalXAIReport                       (Phase 8 ✔)
 data/        synthetic datasets, traces (sample_transfer_success.json), requirements
-experiments/ phase1_demo.py · phase2_sample_trace.py · phase3_demo.py · phase4_demo.py · phase5_demo.py · phase6_demo.py · phase7_demo.py
-tests/       unit (deterministic) + integration (LLM, auto-skip)
+experiments/ phase1_demo.py · phase2_sample_trace.py · phase3_demo.py · phase4_demo.py · phase5_demo.py · phase6_demo.py · phase7_demo.py · phase8_demo.py
+tests/       unit (deterministic) + e2e (scenarios A-I) + integration (LLM, auto-skip)
 ```

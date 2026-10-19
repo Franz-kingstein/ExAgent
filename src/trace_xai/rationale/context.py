@@ -8,6 +8,7 @@ model never has to infer missing evidence and never has to guess.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -65,8 +66,6 @@ class RationaleContext:
     # ---------------------------------------------------------- citable ids
     def allowed_refs(self) -> set[str]:
         """Every token a claim may cite: E-numbers + domain ids in context."""
-        import re
-
         refs = {e.ref for e in self.evidence}
         pattern = re.compile(r"\b(?:REQ-[A-Z]+-\d+|ANOM-\d{4}|CF-\d{4})\b")
         for line in self._all_lines():

@@ -8,11 +8,14 @@ pipeline falls through (lexical NLI backstop -> LLM judge -> UNKNOWN).
 Rule inventory (first decisive rule wins):
   1. limit relation   "within/under the limit" / "exceeded/over the limit"
   2. balance relation "sufficient funds" / "insufficient funds"
-  3. verification     "beneficiary (un)verified"      (missing -> UNKNOWN)
-  4. outcome          "transfer succeeded/rejected" + reason-code equality
+  3. requirement      "REQ-X was satisfied/violated" vs recorded status
+                      (an explicit structured status assertion is decided by
+                      the record, before any incidental sub-claim below)
+  4. verification     "beneficiary (un)verified"      (missing -> UNKNOWN)
+  5. outcome          "transfer succeeded/rejected" + reason-code equality
                       (conflicting success values in evidence -> UNKNOWN)
-  5. requirement      "REQ-X was satisfied/violated" vs recorded status
   6. asserted number  "balance was 9,999" vs recorded operand value
+  7. restatement      verbatim quotation of a cited record -> supported
 """
 
 from __future__ import annotations
@@ -84,7 +87,9 @@ _EXCEEDED = re.compile(
     r"\b(exceed(?:ed|s)?|over the limit|surpass(?:ed|es)?|above the limit)\b", re.I)
 _INSUFFICIENT = re.compile(r"\binsufficient\b|\bnot enough funds?\b", re.I)
 _SUFFICIENT = re.compile(r"\b(sufficient|adequate)\b[^.]{0,30}\b(balance|funds?)\b", re.I)
-_VERIFIED = re.compile(r"\b(beneficiary|payee)\b[^.]{0,30}\b(was|is|been)\s+verified\b", re.I)
+_VERIFIED = re.compile(
+    r"\b(beneficiary|payee)\b[^.]{0,40}\b(was|is|been)\s+"
+    r"(?:recorded\s+as\s+|as\s+|declared\s+|confirmed\s+)?verified\b", re.I)
 _UNVERIFIED = re.compile(
     r"\b(beneficiary|payee)\b[^.]{0,40}\b(unverified|not verified|never verified)\b", re.I)
 _REJECTED = re.compile(r"\b(rejected|declined|refused|failed)\b", re.I)
@@ -231,14 +236,44 @@ def check_asserted_number(claim: str, ops: Operands) -> RuleHit | None:
     return None
 
 
-def run_rules(claim: str, ops: Operands, req_statuses: dict[str, str]) -> RuleHit | None:
+def _normalize(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def check_restatement(claim: str, evidence_lines: list[str]) -> RuleHit | None:
+    """A verbatim restatement of a cited record is supported by that record.
+
+    Counterfactual summaries, deviation lines, etc. are quoted back from the
+    Q2/Q3 records. If the claim's text appears (whitespace-normalized) inside
+    the evidence it cites, it is asserting nothing beyond what the cited
+    record literally says — so the record supports it. A claim that invents
+    content will not appear verbatim and stays UNKNOWN (never SUPPORTED).
+    """
+    target = _normalize(claim)
+    if len(target) < 20:
+        return None  # too short to be a meaningful quotation
+    haystack = _normalize(" | ".join(evidence_lines))
+    if target in haystack:
+        return RuleHit(_SUP,
+                       "claim is a faithful restatement of the cited record "
+                       "(its text appears verbatim in the cited evidence)",
+                       0.9)
+    return None
+
+
+def run_rules(claim: str, ops: Operands, req_statuses: dict[str, str],
+              evidence_lines: list[str] | None = None) -> RuleHit | None:
     for hit in (
         check_limit(claim, ops),
         check_balance(claim, ops),
+        # an explicit "REQ-X: SATISFIED/VIOLATED" assertion is settled by the
+        # recorded requirement status before any incidental sub-claim (e.g. a
+        # "…was verified" clause inside a REQ-BEN line) is examined.
+        check_requirement_status(claim, req_statuses),
         check_verification(claim, ops),
         check_outcome(claim, ops),
-        check_requirement_status(claim, req_statuses),
         check_asserted_number(claim, ops),
+        check_restatement(claim, evidence_lines or []),
     ):
         if hit is not None:
             return hit

@@ -243,6 +243,38 @@ validate/models.py     SUPPORTED/CONTRADICTED/UNKNOWN, PASS/FLAG/BLOCK
   evidence/method/confidence plus counts, unsupported-claim rate, overall
   status, and the guardrail decision.
 
+## Integrated pipeline (Phase 8, delivered)
+
+```
+pipeline.py             TraceXAIPipeline -> FinalXAIReport (15 sections)
+    User Task -> Banking Agent -> Execution Trace
+        1. Requirement Matching    (DecisionExplainer, Q1)
+        2. Deviation Detection     (DeviationExplainer, Q2)
+        3. Trajectory Anomalies    (TrajectoryAnomalyDetector, Q2)
+        4. Counterfactual Analysis (CounterfactualExplainer, Q3)
+        5. SLM Rationale           (RationaleGenerator, Q6, fallback)
+        6. Evidence Validation     (ExplanationValidator, guardrails)
+        -> Final XAI Report (sections 1-15 + embedded sub-reports)
+```
+
+- Pure composition: one shared `DecisionExplainer` instance feeds the
+  deviation and counterfactual explainers (no recomputation); each stage is
+  wrapped for timing, recorded in `report.timings_ms`.
+- Data-flow order is 1–4 → rationale → validation; validation (item 5 in the
+  brief) verifies the rationale's claims, so it runs after item 6's stage —
+  the brief's numbering is the feature list, not the dependency order.
+- Single call: `pipeline.run(task)` (agent executes + analyzes) or
+  `pipeline.analyze_execution(task_id=...)` on a previously stored trace;
+  module-level helper `analyze_execution(task)` builds a one-shot pipeline.
+- `FinalXAIReport` carries the 15 user-facing sections (task, requirements,
+  action, rationale, satisfaction, deviations, anomalies, counterfactuals,
+  evidence, validation, supported/contradicted/unknown claims, uncertainty,
+  limitations) plus the embedded sub-reports, per-stage timings, and an
+  `llm_used` flag; `to_text()` renders the numbered report.
+- Limitations are computed deterministically per report (unknown
+  requirements, non-causal anomaly association, unverified counterfactuals,
+  UNKNOWN/CONTRADICTED claim counts, SLM/judge usage, synthetic data).
+
 ## Phase plan
 
 See `docs/phases.md`.

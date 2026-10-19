@@ -129,7 +129,9 @@ class RationaleGenerator:
         """Find ids cited in prose that do not resolve to the packet."""
         allowed = ctx.allowed_refs()
         issues: list[str] = []
-        token_pattern = re.compile(r"\b(?:E\d+|REQ-[A-Z]+-\d+|ANOM-\d{4}|CF-\d{4})\b")
+        # lookbehind: don't read event-id-embedded numbers (…-E002) as refs
+        token_pattern = re.compile(
+            r"(?<![\w-])(?:E\d+|REQ-[A-Z]+-\d+|ANOM-\d{4}|CF-\d{4})\b")
         for key, text in sections.items():
             for token in sorted(set(token_pattern.findall(text))):
                 if token not in allowed:
@@ -222,12 +224,16 @@ class RationaleGenerator:
             claims.append(RationaleClaim(
                 text=assessment_line, label=ClaimLabel.EVIDENCE, evidence_refs=refs,
             ))
-        if ctx.counterfactuals:
-            claims.append(RationaleClaim(
-                text=ctx.counterfactuals[0],
-                label=ClaimLabel.EVIDENCE,
-                evidence_refs=_domain_refs(ctx.counterfactuals[0], ctx),
-            ))
+        for cf_line in ctx.counterfactuals:
+            refs = _domain_refs(cf_line, ctx)
+            if refs:
+                # a real CF-xxxx record: citable, so a verifiable claim
+                claims.append(RationaleClaim(
+                    text=cf_line, label=ClaimLabel.EVIDENCE, evidence_refs=refs,
+                ))
+                break
+            # a bare note (no CF/REQ/ANOM id) is a limitation, not an
+            # assertion — it cites nothing, so it is not a claim to verify
         if ctx.missing:
             claims.append(RationaleClaim(
                 text="; ".join(ctx.missing), label=ClaimLabel.UNKNOWN, evidence_refs=[],

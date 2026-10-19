@@ -18,7 +18,12 @@ from dataclasses import dataclass, field
 
 from ..rationale.models import ClaimLabel, StructuredRationale
 
-_CITATION_PATTERN = re.compile(r"\b(?:E\d+|REQ-[A-Z]+-\d+|ANOM-\d{4}|CF-\d{4})\b")
+# Citable ids. The `(?<![\w-])` lookbehind keeps event-id-embedded numbers
+# (e.g. the `E002` inside `TRC-SYN-0001-E002`) from being read as evidence
+# refs — evidence refs (E2) and event numbers (E002) are independent schemes,
+# so an embedded number is never a citation.
+_CITATION_PATTERN = re.compile(
+    r"(?<![\w-])(?:E\d+|REQ-[A-Z]+-\d+|ANOM-\d{4}|CF-\d{4})\b")
 
 
 @dataclass
@@ -30,7 +35,17 @@ class ExtractedClaim:
 
 
 def extract_claims(rationale: StructuredRationale) -> list[ExtractedClaim]:
-    """Claims from the array + citable sentences from the five sections."""
+    """Claims from the array + citable sentences from the five sections.
+
+    The prose scan is a hallucination *net for model output*: a model can
+    bury an unsupported assertion in a section even when its ``claims`` array
+    looks clean, so every citable sentence is validated too. The deterministic
+    fallback needs no such net — its sections are a faithful re-rendering of
+    the same context that produced its ``claims`` array, and re-deriving
+    claims from them would only double-count (and surface provenance lines
+    like an evidence-index manifest that assert nothing to verify). So for
+    fallback text (``llm_used=False``) the claims array is authoritative.
+    """
     out: list[ExtractedClaim] = []
     seen: set[str] = set()
 
@@ -42,6 +57,9 @@ def extract_claims(rationale: StructuredRationale) -> list[ExtractedClaim]:
                 text=text, refs=list(claim.evidence_refs),
                 source="claims", label=claim.label.value,
             ))
+
+    if not rationale.llm_used:
+        return out
 
     sections = {
         "decision_rationale": rationale.decision_rationale,

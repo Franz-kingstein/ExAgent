@@ -343,7 +343,10 @@ class TestJudgeBehavior:
 class TestExtraction:
     def test_citable_section_sentences_are_verified(self, trace_ctx):
         _, ctx = trace_ctx
+        # model-produced prose: the hallucination net scans sections even when
+        # the claims array is empty, so a buried citable assertion is caught
         rationale = make_rationale([])
+        rationale.llm_used = True
         rationale.evidence_summary = (
             "The amount of INR 75,000 exceeded the per-transaction limit "
             f"({ref_for(ctx, 'amount_inr')}, {ref_for(ctx, 'per_txn_limits')})."

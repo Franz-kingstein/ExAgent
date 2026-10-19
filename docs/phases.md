@@ -42,8 +42,15 @@
       only, confidence capped, never overrules rules), guardrail decisions
       PASS/FLAG/BLOCK; 20 unit + 3 real-model integration tests; 174 tests
       total.
-- [ ] **Phase 8 — Controlled failures & robustness** *(optional)*: injected
-      anomalies for the deviation detector to explain.
+- [x] **Phase 8 — Integrated pipeline**: `pipeline.py` — `TraceXAIPipeline`
+      composes the validated Q1–Q4 components behind a single call
+      (`analyze_execution(task_id)` / `run(task)`), producing a 15-section
+      `FinalXAIReport` with per-stage timings and embedded sub-reports.
+      Controlled-failure robustness is exercised by end-to-end scenarios
+      C/D (injected anomalies), F (missing evidence), G (conflicting
+      evidence), H (unsupported explanation blocked) in
+      `tests/e2e/test_pipeline.py`; 12 e2e + 1 real-model integration test;
+      189 tests total.
 
 ## Open questions (tracked)
 
