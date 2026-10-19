@@ -28,17 +28,27 @@ researched on a **fully simulated banking agent with completely synthetic/fake f
 Phase 8 — integrated pipeline: done — `TraceXAIPipeline` composes all
 validated Q1–Q4 components behind a single call
 (`analyze_execution(task_id)`) and returns a 15-section `FinalXAIReport`
-with per-stage timings, embedded sub-reports, and computed limitations;
-9 end-to-end scenarios (success, violation, anomaly, combined, counterfactual,
-missing/conflicting evidence, unsupported vs correct explanations);
-189 tests passing. All four research questions Q1–Q4 are implemented.
+with per-stage timings, embedded sub-reports, and computed limitations.
+
+**Final phase (Phases 1-7 of the extension plan) — done:**
+adaptive explanation presentation (4 audience modes with invariant
+evidence/status), metrics (latency split, real token cost, decomposed
+claim quality, labelled CSAT), post-action stability ("After-Effects"),
+metric→trace linkage, experiments A–E, and the Gradio evaluator GUI.
+9 end-to-end scenarios (success, violation, anomaly, combined,
+counterfactual, missing/conflicting evidence, unsupported vs correct
+explanations); see `docs/innovation_summary.md` for what is reused /
+integrated / new / demonstrated / unverified.
 
 ## Quickstart
 
 ```bash
 cd /home/franz/Documents/TRACE-XAI
 uv venv --system-site-packages --python /usr/bin/python3.11 .venv   # already done
-.venv/bin/python -m pytest                                          # run the test suite
+.venv/bin/python -m pytest                                          # full test suite
+.venv/bin/python -m pytest tests/unit tests/e2e                     # fast subset (~1 s)
+.venv/bin/python experiments/final_phase_experiments.py             # experiments A-E
+.venv/bin/python app.py                                             # evaluator GUI on :7860
 ```
 
 One call from task to final XAI report:
@@ -64,10 +74,31 @@ result, report = pipeline.run("Transfer ₹10,000 to beneficiary BOB-001.")
 report = pipeline.analyze_execution(task_id=report.task_id)   # single-call API
 ```
 
+Final-phase additions (all derived from the one validated report):
+
+```python
+report.present("business")          # TECHNICAL | BUSINESS | NORMAL | ELI5
+report.presented_all()              # all four modes; statuses/refs invariant
+report.metrics(simulate_csat=True)  # latency / cost / claim quality / CSAT,
+                                    # each with unit + basis
+                                    # (measured | estimated | simulated | unknown)
+
+from trace_xai.linkage import MetricChange, link_metric
+link_metric(report, MetricChange(metric="unsupported_claim_rate",
+                                 before=0.4, after=0.0,
+                                 related_requirement_ids=["REQ-AMT-001"]))
+
+from trace_xai.stability import PostActionStabilityMonitor, InterventionEvent
+monitor = PostActionStabilityMonitor(anchor_ts, window_ms=60_000)
+monitor.observe(InterventionEvent(timestamp=..., kind=...))
+result = monitor.close(observe_until=...)   # bounded verdict, injected clock
+```
+
 ## Layout
 
 ```
-docs/        architecture, safety policy, phase plan
+docs/        architecture, safety policy, phase plan, final-phase plan,
+             innovation summary (reused / integrated / new / demonstrated)
 configs/     bank_dataset.yaml · requirements_bank.yaml (registry), scenarios, judge prompts
 src/trace_xai/
   banking/       state.py · dataset.py · environment.py · results.py   (Phase 1 ✔)
@@ -75,11 +106,16 @@ src/trace_xai/
   core/          trace.py (schema) · recorder.py                       (Phase 2 ✔)
   requirements/  model.py (registry + constraint types)                (Phase 3 ✔)
   explain/       matcher.py · decision.py (Q1) · anomaly.py · deviation.py (Q2)
-                 · counterfactual.py (Q3)                                 (Phase 3-5 ✔)
+                 · counterfactual.py (Q3)                                (Phase 3-5 ✔)
   rationale/     context.py · template.py · provider.py · generator.py   (Phase 6 ✔)
   validate/      extract.py · rules.py · judge.py · validator.py         (Phase 7 ✔)
   pipeline.py    TraceXAIPipeline -> FinalXAIReport                       (Phase 8 ✔)
+  presentation/  modes.py · presenter.py — 4 audience modes (final ✔)
+  metrics/       models.py · collector.py — latency/cost/claims/CSAT      (final ✔)
+  stability/     models.py · monitor.py — post-action stability           (final ✔)
+  linkage/       models.py · linker.py — metric→trace chains              (final ✔)
+app.py         Gradio evaluator GUI (7 tabs, 12 capabilities)             (final ✔)
 data/        synthetic datasets, traces (sample_transfer_success.json), requirements
-experiments/ phase1_demo.py · phase2_sample_trace.py · phase3_demo.py · phase4_demo.py · phase5_demo.py · phase6_demo.py · phase7_demo.py · phase8_demo.py
+experiments/ phase1-8 demos + final_phase_experiments.py (A-E) + results/
 tests/       unit (deterministic) + e2e (scenarios A-I) + integration (LLM, auto-skip)
 ```

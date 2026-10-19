@@ -52,9 +52,59 @@
       `tests/e2e/test_pipeline.py`; 12 e2e + 1 real-model integration test;
       189 tests total.
 
+## Final phase (extension plan — see `docs/final_phase_plan.md`)
+
+- [x] **Increment 1 — Adaptive explanation presentation**: `presentation/`
+      package — TECHNICAL/BUSINESS/NORMAL/ELI5 modes generated as a pure
+      deterministic function of the validated `FinalXAIReport` (statuses,
+      counts, guardrail and evidence refs copied, never recomputed);
+      FACT/INFERENCE/UNKNOWN tags on every rendered line; ELI5 analogies
+      labelled "(not evidence)"; socket-blocking test proves no model is
+      consulted; 24 tests.
+- [x] **Increment 2 — Metrics**: `metrics/` package — latency split
+      (agent execution / XAI analysis / end-to-end, all ms, perf_counter,
+      unmeasured = UNKNOWN not 0), real provider token usage
+      (`model_usage` captured from Ollama `last_usage`) with cost UNKNOWN
+      unless pricing supplied (then ESTIMATED + source), decomposed claim
+      quality (`unsupported = (contradicted + unknown)/total` with
+      UNKNOWN never called a hallucination), CSAT NOT_COLLECTED with a
+      deterministic labelled simulated variant + `CSATRecorder`; 23 tests.
+- [x] **Increment 3 — Post-action stability**: `stability/` package —
+      bounded monitoring window (configurable), intervention types,
+      observation gaps, statuses INTERVENTION_DETECTED /
+      NO_INTERVENTION_OBSERVED / INSUFFICIENT_OBSERVATION, recorded end
+      reason, intervention-free duration; injected logical-clock time
+      (no waiting ever); never claims correctness or indefinite
+      stability; 24 tests.
+- [x] **Increment 4 — Metric→trace linkage**: `linkage/` package —
+      METRIC → OBSERVED CHANGE → RELEVANT TRACE EVENTS → EXPLANATION
+      CLAIM → EVIDENCE REFERENCES → VALIDATION STATUS chains, labelled
+      ASSOCIATION/HYPOTHESIS (never causal; CSAT/retention always
+      hypothesis); field-level scoping; 12 tests.
+- [x] **Increment 5 — Experiments A–E**: `experiments/
+      final_phase_experiments.py` — (A) presentation consistency across
+      identical traces, (B) no-validation baseline vs full pipeline with
+      false-acceptance/detection metrics against synthetic ground truth,
+      (C) metric evaluation over 5 scenarios, (D) PAS over 7 cases
+      incl. interruption/short window, (E) Phase 8 vs extended system
+      compatibility; each with documented limitations; results in
+      `experiments/results/final_phase_results.json`; 13 regression tests.
+- [x] **Increment 6 — Evaluator GUI**: `app.py` (Gradio 5.38) — 7 tabs /
+      12 capabilities (scenario run, trace inspection, all explanations,
+      mode selection, evidence & status, latency+cost, claim lists, CSAT
+      controls, After-Effects, metric→trace linkage, consolidated
+      report, export text+JSON); every metric shows unit + basis;
+      launch verified (HTTP 200); 28 tests.
+- [x] **Increment 7 — Docs & summary**: README status/run/layout,
+      this phase log, `docs/innovation_summary.md` (reused vs integrated
+      vs new vs demonstrated vs unverified, with an online literature
+      review), final test run: **312 tests passing** (unit + e2e +
+      integration incl. real-model tests).
+
 ## Open questions (tracked)
 
 - Semantic/embedding-based matching deferred: no local embedding model (disk budget).
 - LLM judge shipped with `qwen3.5:4b`; a second judge model comparison
   (e.g. `llama3.2`) remains open — judge verdicts are capped and advisory only.
-- Demo UI (FastAPI/Gradio) decision deferred until after Phase 8.
+- Demo UI: **resolved** — Gradio evaluator GUI shipped as `app.py`
+  (FastAPI alternative not needed; Gradio 5.38 was already installed).

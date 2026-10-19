@@ -275,6 +275,44 @@ pipeline.py             TraceXAIPipeline -> FinalXAIReport (15 sections)
   requirements, non-causal anomaly association, unverified counterfactuals,
   UNKNOWN/CONTRADICTED claim counts, SLM/judge usage, synthetic data).
 
+## Final-phase layers (delivered)
+
+Four packages plus a GUI, all *derived from or composed over* the validated
+Phase 1–8 artifacts — no component was redesigned, and no verdict is ever
+recomputed downstream:
+
+```
+presentation/   4 audience modes = pure function of FinalXAIReport
+                (statuses/counts/guardrail/evidence copied; FACT/INFERENCE/
+                UNKNOWN tags; invariance digests tested)
+metrics/        collect_metrics(report) -> MetricsBundle
+                latency (agent | XAI | end-to-end, ms, perf_counter;
+                         unmeasured = UNKNOWN not 0)
+                cost (model_usage from provider last_usage; tokens measured;
+                      cost UNKNOWN unless pricing supplied -> ESTIMATED)
+                claim quality (unsupported=(contradicted+unknown)/total;
+                      contradiction vs unverifiable split; UNKNOWN != lie)
+                CSAT (NOT_COLLECTED unless a rating is explicitly recorded;
+                      simulated variant deterministic + labelled)
+stability/      PostActionStabilityMonitor: bounded window + intervention
+                types + observation gaps -> INTERVENTION_DETECTED /
+                NO_INTERVENTION_OBSERVED / INSUFFICIENT_OBSERVATION,
+                end reason + durations recorded; injected clock (no waiting)
+linkage/        link_metric() -> 6-step chain (METRIC -> OBSERVED CHANGE ->
+                RELEVANT TRACE EVENTS -> EXPLANATION CLAIM -> EVIDENCE
+                REFS -> VALIDATION STATUS), ASSOCIATION/HYPOTHESIS only
+pipeline.py     + agent_execution_ms, + model_usage, + report.metrics()
+                (backwards-compatible fields; timings_ms unchanged)
+app.py          Gradio evaluator GUI: 7 tabs, 12 capabilities, every panel
+                wired to the real handlers above; export text+JSON
+```
+
+Data-flow rule for all of them: **read-only derivation**. Presentation,
+metrics, linkage and the GUI consume `FinalXAIReport` /
+`ExecutionTrace` and produce new views; they never mutate the validated
+artifacts, and their outputs are reproducible from the same inputs
+(asserted by determinism tests at every layer).
+
 ## Phase plan
 
 See `docs/phases.md`.

@@ -56,3 +56,21 @@ artifact in this repository.
   no-invented-evidence invariants.
 - Any change weakening these guarantees requires updating this document in the same
   commit.
+
+## 6. GUI and exports (final phase)
+
+- The evaluator GUI (`app.py`, Gradio) and all exports run entirely
+  locally: scenarios are generated in the sandbox, no external service is
+  called, and no credentials or real account data exist anywhere in the
+  app (see the module docstring in `app.py`).
+- **CSAT**: real ratings appear only when a person explicitly records one
+  in the session (`CSATRecorder.record`); nothing is inferred or
+  fabricated. The simulated CSAT/retention variant is labelled
+  `SIMULATED` with its formula shown, and is never presented as user
+  feedback.
+- **After-Effects (stability)**: observation inputs (interventions, gaps)
+  are entered/labelled as simulated; verdicts are bounded by the chosen
+  window and never claimed as proof of correctness.
+- **Exports** (`export_files` in `app.py`) contain only what the pipeline
+  already produced: the 15-section report, the four presentations, the
+  metrics bundle — all synthetic by construction.
