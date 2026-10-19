@@ -115,6 +115,22 @@ class FinalXAIReport(BaseModel):
     method: str = "trace_xai_pipeline_v1"
 
     # ---------------------------------------------------------- rendering
+    def present(self, mode):
+        """Audience-adapted view (technical/business/normal/eli5).
+
+        Pure re-wording of this validated report: statuses, counts, guardrail
+        and evidence references are copied unchanged. See presentation/.
+        """
+        from .presentation import PresentationMode, present_report
+
+        return present_report(self, PresentationMode(mode))
+
+    def presented_all(self) -> dict:
+        """All four presentation modes from this one validated report."""
+        from .presentation import present_all
+
+        return present_all(self)
+
     def to_text(self) -> str:
         """Human-readable final report with the 15 numbered sections."""
         lines: list[str] = []
