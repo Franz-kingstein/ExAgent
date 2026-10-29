@@ -263,11 +263,56 @@ class TestMarkdownRendering:
             for row in p.requirements:
                 assert row.requirement_id in md
                 assert row.status_text in md
+            # every evidence ref id AND its recorded value must be readable
             for ref in p.evidence_index[:3]:
-                assert ref in md, f"{mode}: evidence line missing in md"
-            # counts and rate appear in the markdown too
-            assert str(p.counts) in md
+                ref_id, sep, rest = ref.partition(" = ")
+                assert sep, "evidence index lines are 'REF = value...'"
+                assert f"**{ref_id}**" in md, f"{mode}: ref id missing in md"
+                assert rest in md, f"{mode}: ref value missing in md"
+            # the counts appear as readable numbers with their labels —
+            # never as a Python dict repr
+            assert str(p.counts) not in md
+            count_line = next(line for line in md.splitlines()
+                              if "Claims checked" in line)
+            assert str(p.counts["total"]) in count_line
+            for bucket in ("supported", "contradicted", "unknown"):
+                assert bucket in count_line
+                assert str(p.counts[bucket]) in count_line
             assert f"{p.unsupported_claim_rate:.3f}" in md
+            # the guardrail decision is always glossed in plain language
+            gloss = {"PASS": "may be shown as-is",
+                     "FLAG": "shown only with uncertainty caveats",
+                     "BLOCK": "must not be shown until corrected"}
+            assert gloss[p.guardrail] in md
+
+    def test_markdown_tells_one_story_without_duplicates(self,
+                                                         violation_report):
+        """Claims/evidence must appear once — not as a story block and
+        again as a dedicated proof section (the old double render)."""
+        for mode in MODES:
+            p = present_report(violation_report, mode)
+            md = p.to_markdown()
+            for claim in p.status_digest():
+                assert md.count(f"\"{claim}\"") == 1, \
+                    f"{mode}: claim rendered twice"
+            for ref in p.evidence_index:
+                ref_id, _, _ = ref.partition(" = ")
+                assert md.count(f"**{ref_id}**") == 1, \
+                    f"{mode}: evidence ref rendered twice"
+
+    def test_markdown_headings_follow_the_audience(self, violation_report):
+        """Sections are titled with the audience wording, not jargon."""
+        from trace_xai.presentation.modes import INTRO
+        for mode in MODES:
+            md = present_report(violation_report, mode).to_markdown()
+            assert f"### {INTRO[mode]['requirements']}" in md, mode
+            assert f"### {INTRO[mode]['claims']}" in md, mode
+            assert f"### {INTRO[mode]['evidence']}" in md, mode
+            # story-first order: the requirements section comes before the
+            # proof divider that precedes the claim checks
+            story = md.index(INTRO[mode]["requirements"])
+            proof = md.index(INTRO[mode]["claims"])
+            assert story < proof, mode
 
     def test_markdown_has_no_text_separator_artifacts(self, violation_report):
         for mode in MODES:

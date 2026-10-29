@@ -111,7 +111,9 @@ class TestExplanationsAndEvidence:
         for mode in gui.MODES:
             text, digest = gui.explanation_view(mode, state)
             texts[mode] = text
-            assert "Cross-mode check" in text
+            # the story panel is pure markdown; the invariance check is
+            # returned as its own digest line, not between reader and story
+            assert "Cross-mode check" in digest
             assert "✅" in digest and "❌" not in digest
         assert len(set(texts.values())) == 4      # wording really differs
 

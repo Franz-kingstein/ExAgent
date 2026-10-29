@@ -68,6 +68,36 @@ _REASON_PLAIN = {
 
 _ACTION_PAIR = re.compile(r"^([a-z_]+):\s*(.*)$")
 
+# Presentation helpers for the markdown renderer (formatting only — the
+# recorded status tokens always appear verbatim next to these markers).
+_STATUS_ICON = {
+    "SATISFIED": "✅", "SUPPORTED": "✅",
+    "VIOLATED": "❌", "CONTRADICTED": "❌",
+    "UNKNOWN": "❓",
+}
+
+# Plain-language gloss for the guardrail decision (mirrors the meanings in
+# trace_xai.validate.models.GuardrailDecision).
+_GUARDRAIL_GLOSS = {
+    "PASS": "may be shown as-is",
+    "FLAG": "shown only with uncertainty caveats",
+    "BLOCK": "must not be shown until corrected",
+}
+
+# Heading for the validation numbers, per audience.
+_VALIDATION_TITLE = {
+    PresentationMode.TECHNICAL: "Validation summary",
+    PresentationMode.BUSINESS: "Validation summary",
+    PresentationMode.NORMAL: "What the checks found",
+    PresentationMode.ELI5: "How the checks turned out",
+}
+
+# These block keys have their own dedicated sections in the markdown; the
+# story loop must skip them so claims/evidence/uncertainty/limitations are
+# rendered exactly once (never once as a story block and again below).
+_PROOF_BLOCK_KEYS = frozenset({"claims", "evidence", "uncertainty",
+                               "limitations"})
+
 
 class PresentedLine(BaseModel):
     """One rendered line with its epistemic class and any cited refs."""
@@ -226,70 +256,114 @@ class PresentedExplanation(BaseModel):
     def to_markdown(self) -> str:
         """Markdown rendering of the *same* items as ``to_text()``.
 
-        Presentation-only alternative for UI panels: real headings instead
-        of ``-- title --`` separators, and a legend for the epistemic tags.
-        Every status, claim text, evidence reference and count is the same
-        recorded value as in ``to_text()`` — this method re-renders, it never
-        recomputes (asserted by tests/unit/test_presentation.py).
+        Built for any kind of reader: the **story first** (what happened,
+        why, which rules it ran into), then a divider and the **proof**
+        (claim checks, validation numbers, the exact records, what stays
+        uncertain). Claims, evidence, uncertainty and limitations appear
+        exactly once — the story-block copies of those sections are
+        skipped. Every status, claim text, evidence reference and count is
+        the same recorded value as in ``to_text()``; this method re-renders,
+        it never recomputes (asserted by tests/unit/test_presentation.py).
         """
+        intro = INTRO[self.mode]
         out: list[str] = []
         out.append(f"#### {self.mode.value.upper()} explanation — "
                    f"{self.audience}")
-        out.append(self.description)
+        out.append(f"*{self.description}*")
         out.append("")
         out.append(f"> {self.headline}")
         out.append("")
-        out.append("**How to read the tags** — `FACT`: settled by the "
-                   "recorded evidence · `INFERENCE`: derived or predicted, "
-                   "not directly observed · `UNKNOWN`: not determinable "
-                   "from the recorded evidence (never upgraded to a fact).")
+        out.append("**How to read the tags:** [FACT] proven by the records · "
+                   "[INFERENCE] an educated guess, not an observation · "
+                   "[UNKNOWN] the records don't say — never upgraded, even "
+                   "when the wording gets simpler.")
 
+        # --- the story: what happened, why, what it ran into -------------
         for block in self.blocks:
+            if block.key in _PROOF_BLOCK_KEYS or not block.lines:
+                continue
             out.append("")
             out.append(f"### {block.title}")
             for line in block.lines:
-                out.append(f"- `{line.kind.value}` {line.text}")
+                out.append(f"- [{line.kind.value}] {line.text}")
 
         if self.requirements:
             out.append("")
-            out.append("### Requirements")
+            out.append(f"### {intro['requirements']}")
             for r in self.requirements:
-                out.append(f"- `{r.kind.value}` **{r.requirement_id}** — "
-                           f"{r.status_text}: {r.requirement_text} "
-                           f"(confidence {r.confidence:.2f})")
-                if r.evidence:
-                    out.append(f"  - evidence: {'; '.join(r.evidence)}")
+                icon = _STATUS_ICON.get(r.status, "•")
+                out.append(f"- {icon} [{r.kind.value}] "
+                           f"**{r.requirement_id}** — {r.status_text}: "
+                           f"{r.requirement_text}")
+                if self.mode in (PresentationMode.TECHNICAL,
+                                 PresentationMode.BUSINESS) and r.detail:
+                    out.append(f"  - {r.detail}")
+                details = [f"confidence {r.confidence:.2f}"]
+                refs = sorted(_claim_refs(r.evidence))
+                if refs:
+                    details.append(f"evidence: {', '.join(refs)}")
                 if r.conflicting:
-                    out.append(f"  - conflicting: {'; '.join(r.conflicting)}")
+                    details.append("conflicting records: "
+                                   + "; ".join(r.conflicting))
+                out.append("  - " + " · ".join(details))
+
+        # --- the proof: checks, numbers, records, uncertainty -----------
+        out.append("")
+        out.append("---")
+        out.append("*Below is the **proof** — the checks run on this "
+                   "explanation, the exact records behind every claim, and "
+                   "what stays uncertain. Nothing here changes between the "
+                   "four modes.*")
 
         if self.claims:
             out.append("")
-            out.append("### Verified claims")
+            out.append(f"### {intro['claims']}")
             for c in self.claims:
-                out.append(f"- `{c.status}` {c.claim}")
-                if c.evidence:
-                    out.append(f"  - evidence: {'; '.join(c.evidence)}")
+                icon = _STATUS_ICON.get(c.status, "•")
+                word = _CLAIM_STATUS_WORD[self.mode].get(c.status, c.status)
+                label = c.status if word == c.status \
+                    else f"{c.status} · {word}"
+                out.append(f"- {icon} [{c.kind.value}] **{label}** — "
+                           f"\"{c.claim}\"")
+                meta = [f"checked by {c.method}",
+                        f"confidence {c.confidence:.2f}"]
+                refs = sorted(_claim_refs(c.evidence))
+                if refs:
+                    meta.append(f"evidence: {', '.join(refs)}")
+                out.append(f"  - {' · '.join(meta)}")
+                if self.mode is PresentationMode.TECHNICAL and c.explanation:
+                    out.append(f"  - {c.explanation}")
 
+        counts = self.counts
         out.append("")
-        out.append(f"### Evidence index ({len(self.evidence_index)} entries)")
-        for e in self.evidence_index:
-            out.append(f"- {e}")
+        out.append(f"### {_VALIDATION_TITLE.get(self.mode, 'Validation summary')}")
+        out.append(f"- Claims checked: **{counts.get('total', 0)}** — "
+                   f"✅ {counts.get('supported', 0)} supported · "
+                   f"❌ {counts.get('contradicted', 0)} contradicted · "
+                   f"❓ {counts.get('unknown', 0)} unknown")
+        out.append(f"- Unsupported-claim rate: "
+                   f"**{self.unsupported_claim_rate:.3f}** — claims the "
+                   "records could not back, out of all checked")
+        verdict = (f"- Overall: **{self.overall_status}** · Guardrail: "
+                   f"**{self.guardrail}**")
+        gloss = _GUARDRAIL_GLOSS.get(self.guardrail)
+        out.append(f"{verdict} — {gloss}" if gloss else verdict)
 
-        out.append("")
-        out.append("### Validation")
-        out.append(f"- counts: {self.counts}")
-        out.append(f"- unsupported_claim_rate: "
-                   f"{self.unsupported_claim_rate:.3f}")
-        out.append(f"- overall: {self.overall_status} · guardrail: "
-                   f"{self.guardrail}")
+        if self.evidence_index:
+            out.append("")
+            out.append(f"### {intro['evidence']} "
+                       f"({len(self.evidence_index)} records)")
+            for e in self.evidence_index:
+                ref, sep, rest = e.partition(" = ")
+                out.append(f"- **{ref}** — {rest}" if sep else f"- {e}")
 
         if self.uncertainty:
             out.append("")
-            out.append("### Uncertainty")
-            out.extend(f"- {u}" for u in self.uncertainty)
+            out.append(f"### {intro['uncertainty']}")
+            out.extend(f"- [UNKNOWN] {u}" for u in self.uncertainty)
         if self.limitations:
             out.append("")
-            out.append("### Limitations")
+            out.append(f"### {intro['limitations']}")
             out.extend(f"- {l}" for l in self.limitations)
 
         out.append("")

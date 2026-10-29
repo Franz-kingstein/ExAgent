@@ -277,17 +277,22 @@ def trace_view(state: dict) -> str:
 
 
 def explanation_view(mode: str, state: dict):
-    """The selected audience mode + the cross-mode invariance digest."""
+    """The selected audience mode + the cross-mode invariance digest.
+
+    The panel text is the readable markdown only (story first, then the
+    proof); the cross-mode digest is returned separately so it never sits
+    between the reader and the story.
+    """
     report = state.get("report")
     if report is None:
         return "Run a scenario first.", ""
     presented = present_all(report)
     chosen = presented[PresentationMode(mode)]
     all_modes = present_report_digests(presented)
-    header = (f"**Cross-mode check (same validated report):** {all_modes}\n\n"
-              f"Evidence, claim texts, statuses and counts are copied from "
-              f"the validated report — only the wording changes.\n\n---\n")
-    return header + chosen.to_markdown(), all_modes
+    digest = (f"**Cross-mode check (same validated report):** {all_modes}\n\n"
+              "The four modes re-render one validated report — the full raw "
+              "records live in tab 3.")
+    return chosen.to_markdown(), digest
 
 
 def present_report_digests(presented: dict) -> str:
@@ -549,10 +554,21 @@ def build_app() -> gr.Blocks:
 
         with gr.Tab("2 · Explanations (4 audience modes)"):
             gr.Markdown(
-                "One validated analysis, four wordings. Evidence, claim "
-                "texts, statuses and counts never change between modes — "
-                "only the language does. UNKNOWN never becomes 'supported' "
-                "by simplifying.")
+                "### How to read the explanations\n"
+                "1. **Pick an audience** (radio below). Every mode shows "
+                "*the same validated analysis* — same evidence, same claim "
+                "verdicts, same numbers — only the wording changes; an "
+                "UNKNOWN is never upgraded by simplifying.\n"
+                "2. **Read in order:** the *story* first (what happened, "
+                "why, which rules), then — below the divider — the *proof* "
+                "(claim checks, validation numbers, the exact records, "
+                "what stays uncertain).\n"
+                "3. **Every line is tagged:** [FACT] proven by the records "
+                "· [INFERENCE] an educated guess · [UNKNOWN] the records "
+                "don't say.\n"
+                "4. **Full raw records** (trace paths, values, sources) "
+                "live in tab *3 · Evidence & claims* and in the exported "
+                "report.")
             mode = gr.Radio(choices=MODES, value="normal",
                             label="Explanation mode")
             expl_digest = gr.Markdown(

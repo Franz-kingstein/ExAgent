@@ -98,7 +98,8 @@ result = monitor.close(observe_until=...)   # bounded verdict, injected clock
 
 ```
 docs/        architecture, safety policy, phase plan, final-phase plan,
-             innovation summary (reused / integrated / new / demonstrated)
+             innovation summary (reused / integrated / new / demonstrated),
+             reading_the_explanations.md (how to read tab 2)
 configs/     bank_dataset.yaml · requirements_bank.yaml (registry), scenarios, judge prompts
 src/trace_xai/
   banking/       state.py · dataset.py · environment.py · results.py   (Phase 1 ✔)
