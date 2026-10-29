@@ -480,6 +480,23 @@ class TestGradioWiring:
             asyncio.run(demo.postprocess_data(bf, ("head", ["row"]),
                                               SessionState(demo)))
 
+    def test_downstream_panels_chained_after_the_run(self):
+        """Evidence/metrics/consolidated/trace read the FRESH state, so
+        they must run *after* run_scenario commits it. As plain same-click
+        listeners they snapshotted the PRE-run state and the tables stayed
+        'Run a scenario first.' forever — a browser-only bug: handler and
+        HTTP tests call them post-commit and never saw it."""
+        demo = _app()
+        run = next(b for b in demo.fns.values()
+                   if getattr(b.fn, "__name__", "") == "run_scenario")
+        for name in ("trace_view", "evidence_view", "metrics_view",
+                     "consolidated_view"):
+            panel = next(b for b in demo.fns.values()
+                         if getattr(b.fn, "__name__", "") == name
+                         and b.targets and b.targets[0][1] == "then")
+            assert panel.trigger_after == run._id, \
+                f"{name} is not chained after the run event"
+
     def test_postprocess_layer_would_catch_the_interactive_update(self):
         """Guard: the other shipped bug — update dict into a Markdown."""
         demo = _app()

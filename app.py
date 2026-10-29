@@ -707,20 +707,25 @@ def build_app() -> gr.Blocks:
             export_txt = gr.File(label="Text report")
             export_json = gr.File(label="JSON (report + 4 presentations + metrics)")
 
-        run_btn.click(run_scenario,
-                      inputs=[scenario, custom, state, mode, use_slm],
-                      outputs=[run_out, trace_rows, state, expl_out,
-                               expl_proof, expl_digest, pas_out])
-        run_btn.click(trace_view, inputs=[state], outputs=[trace_head])
-        # populate the other tabs from the fresh state after each run
-        run_btn.click(evidence_view, inputs=[state],
-                      outputs=[ev_head, ev_index, claims])
-        run_btn.click(metrics_view,
-                      inputs=[state, use_pricing, prompt_price,
-                              completion_price, simulate],
-                      outputs=[metrics_out])
-        run_btn.click(consolidated_view, inputs=[state],
-                      outputs=[report_out])
+        run_event = run_btn.click(run_scenario,
+                                  inputs=[scenario, custom, state, mode,
+                                          use_slm],
+                                  outputs=[run_out, trace_rows, state,
+                                           expl_out, expl_proof, expl_digest,
+                                           pas_out])
+        # The remaining state-driven panels must run AFTER run_scenario
+        # commits the fresh state. As plain same-click listeners they would
+        # be fired in parallel and snapshot the PRE-run state, so the
+        # evidence/metrics/report tables stayed empty after every run.
+        run_event.then(trace_view, inputs=[state], outputs=[trace_head])
+        run_event.then(evidence_view, inputs=[state],
+                       outputs=[ev_head, ev_index, claims])
+        run_event.then(metrics_view,
+                       inputs=[state, use_pricing, prompt_price,
+                               completion_price, simulate],
+                       outputs=[metrics_out])
+        run_event.then(consolidated_view, inputs=[state],
+                       outputs=[report_out])
         mode.change(explanation_view, inputs=[mode, state],
                     outputs=[expl_out, expl_proof, expl_digest])
         rate_btn.click(csat_record, inputs=[rating, state],
