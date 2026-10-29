@@ -99,6 +99,11 @@ _PROOF_BLOCK_KEYS = frozenset({"claims", "evidence", "uncertainty",
                                "limitations"})
 
 
+def _cell(text: str) -> str:
+    """Escape one value for a markdown table cell (pipes would split it)."""
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
 class PresentedLine(BaseModel):
     """One rendered line with its epistemic class and any cited refs."""
 
@@ -253,17 +258,14 @@ class PresentedExplanation(BaseModel):
                    "evidence and conclusions do not change")
         return "\n".join(out)
 
-    def to_markdown(self) -> str:
-        """Markdown rendering of the *same* items as ``to_text()``.
+    def story_markdown(self) -> str:
+        """The **story half** of ``to_markdown()``: what happened, why, and
+        which rules it ran into — in the audience's wording.
 
-        Built for any kind of reader: the **story first** (what happened,
-        why, which rules it ran into), then a divider and the **proof**
-        (claim checks, validation numbers, the exact records, what stays
-        uncertain). Claims, evidence, uncertainty and limitations appear
-        exactly once — the story-block copies of those sections are
-        skipped. Every status, claim text, evidence reference and count is
-        the same recorded value as in ``to_text()``; this method re-renders,
-        it never recomputes (asserted by tests/unit/test_presentation.py).
+        The UI renders this as the main panel; ``proof_markdown()`` is the
+        checkable second half shown underneath. Same recorded values either
+        way — headings, bold tags, a rules table and (for the technical
+        pipe-string headline) one field per line are presentation only.
         """
         intro = INTRO[self.mode]
         out: list[str] = []
@@ -271,7 +273,14 @@ class PresentedExplanation(BaseModel):
                    f"{self.audience}")
         out.append(f"*{self.description}*")
         out.append("")
-        out.append(f"> {self.headline}")
+        # the technical headline is one pipe-separated string; showing its
+        # fields as one-per-line re-renders the same recorded text
+        if self.mode is PresentationMode.TECHNICAL and " | " in self.headline:
+            out.append("**In one line:**")
+            out.extend(f"- {field.strip()}"
+                       for field in self.headline.split(" | "))
+        else:
+            out.append(f"> {self.headline}")
         out.append("")
         out.append("**How to read the tags:** [FACT] proven by the records · "
                    "[INFERENCE] an educated guess, not an observation · "
@@ -285,31 +294,42 @@ class PresentedExplanation(BaseModel):
             out.append("")
             out.append(f"### {block.title}")
             for line in block.lines:
-                out.append(f"- [{line.kind.value}] {line.text}")
+                out.append(f"- **[{line.kind.value}]** {line.text}")
 
         if self.requirements:
             out.append("")
             out.append(f"### {intro['requirements']}")
+            out.append("| | Rule | Result | Confidence | Evidence |")
+            out.append("|---|---|---|---|---|")
             for r in self.requirements:
                 icon = _STATUS_ICON.get(r.status, "•")
-                out.append(f"- {icon} [{r.kind.value}] "
-                           f"**{r.requirement_id}** — {r.status_text}: "
-                           f"{r.requirement_text}")
+                word = (r.status_text if r.status_text == r.status
+                        else f"{r.status_text} ({r.status})")
+                refs = ", ".join(sorted(_claim_refs(r.evidence))) or "—"
+                out.append(f"| {icon} **{r.requirement_id}** | "
+                           f"{_cell(r.requirement_text)} | "
+                           f"{_cell(word)} | {r.confidence:.2f} | {refs} |")
+            for r in self.requirements:
                 if self.mode in (PresentationMode.TECHNICAL,
                                  PresentationMode.BUSINESS) and r.detail:
-                    out.append(f"  - {r.detail}")
-                details = [f"confidence {r.confidence:.2f}"]
-                refs = sorted(_claim_refs(r.evidence))
-                if refs:
-                    details.append(f"evidence: {', '.join(refs)}")
-                if r.conflicting:
-                    details.append("conflicting records: "
-                                   + "; ".join(r.conflicting))
-                out.append("  - " + " · ".join(details))
+                    out.append(f"- **{r.requirement_id}:** {r.detail}")
+            conflicts = [f"**{r.requirement_id}:** {'; '.join(r.conflicting)}"
+                         for r in self.requirements if r.conflicting]
+            if conflicts:
+                out.append("")
+                out.append("**Conflicting records in the trace:**")
+                out.extend(f"- {c}" for c in conflicts)
+        return "\n".join(out)
 
-        # --- the proof: checks, numbers, records, uncertainty -----------
-        out.append("")
-        out.append("---")
+    def proof_markdown(self) -> str:
+        """The **proof half** of ``to_markdown()``: claim checks, the
+        validation numbers, the exact records, and what stays uncertain.
+
+        Identical in all four modes — the UI shows it in a labelled
+        (collapsible) section under the story.
+        """
+        intro = INTRO[self.mode]
+        out: list[str] = ["---"]
         out.append("*Below is the **proof** — the checks run on this "
                    "explanation, the exact records behind every claim, and "
                    "what stays uncertain. Nothing here changes between the "
@@ -336,7 +356,8 @@ class PresentedExplanation(BaseModel):
 
         counts = self.counts
         out.append("")
-        out.append(f"### {_VALIDATION_TITLE.get(self.mode, 'Validation summary')}")
+        out.append(f"### "
+                   f"{_VALIDATION_TITLE.get(self.mode, 'Validation summary')}")
         out.append(f"- Claims checked: **{counts.get('total', 0)}** — "
                    f"✅ {counts.get('supported', 0)} supported · "
                    f"❌ {counts.get('contradicted', 0)} contradicted · "
@@ -360,7 +381,7 @@ class PresentedExplanation(BaseModel):
         if self.uncertainty:
             out.append("")
             out.append(f"### {intro['uncertainty']}")
-            out.extend(f"- [UNKNOWN] {u}" for u in self.uncertainty)
+            out.extend(f"- **[UNKNOWN]** {u}" for u in self.uncertainty)
         if self.limitations:
             out.append("")
             out.append(f"### {intro['limitations']}")
@@ -371,6 +392,19 @@ class PresentedExplanation(BaseModel):
         out.append("*synthetic data only · wording adapts to the audience; "
                    "evidence and conclusions do not change*")
         return "\n".join(out)
+
+    def to_markdown(self) -> str:
+        """Markdown document = story half + proof half.
+
+        Built for any kind of reader: the **story first** (what happened,
+        why, which rules it ran into), then the **proof** (claim checks,
+        validation numbers, the exact records, what stays uncertain).
+        Claims, evidence, uncertainty and limitations appear exactly once.
+        Every status, claim text, evidence reference and count is the same
+        recorded value as in ``to_text()``; this re-renders, it never
+        recomputes (asserted by tests/unit/test_presentation.py).
+        """
+        return self.story_markdown() + "\n\n" + self.proof_markdown()
 
 
 # ------------------------------------------------------------ internals

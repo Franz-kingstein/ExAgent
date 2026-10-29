@@ -170,6 +170,37 @@ EXAMPLE_GAP = json.dumps(
     indent=2)
 
 
+# Readability styling for the explanation panels: comfortable line length,
+# larger section headings with an accent, the headline as a callout box.
+# Only sizing/spacing/colors — no content is affected.
+EXPLANATION_CSS = """
+#explanation-guide, #expl-digest, #expl-story, #expl-proof {
+    max-width: 920px;
+}
+#expl-story h4, #expl-proof h4 {
+    font-size: 1.3rem;
+    margin: .4em 0 .15em;
+}
+#expl-story h3, #expl-proof h3 {
+    font-size: 1.05rem;
+    color: #2b6cb0;
+    margin: 1.25em 0 .4em;
+    padding-bottom: .15em;
+    border-bottom: 1px solid rgba(43, 108, 176, .3);
+}
+#expl-story blockquote {
+    border-left: 4px solid #2b6cb0;
+    background: rgba(43, 108, 176, .08);
+    border-radius: 0 8px 8px 0;
+    padding: .6em 1em;
+    margin: .5em 0 .9em;
+}
+#expl-story table, #expl-proof table {
+    font-size: .95rem;
+}
+"""
+
+
 def _fresh_state() -> dict:
     return {"report": None, "trace": None, "result": None,
             "csat": CSATRecorder(), "pas_events": [], "pas_gaps": []}
@@ -240,12 +271,12 @@ def run_scenario(scenario_name: str, custom_task: str, state: dict,
                        "(local sandbox, no external calls)*")
     # fill the downstream panels from the new state directly, so every tab
     # has real content the moment the run completes (no empty outputs)
-    expl_text, expl_digest = explanation_view(mode_name, state)
+    expl_text, expl_proof, expl_digest = explanation_view(mode_name, state)
     pas_msg = ("Run complete. Enter simulated observation data "
                "(interventions / gaps) below and press "
                "'Evaluate After-Effects'.")
     return ("\n".join(summary), _trace_rows(trace), state,
-            expl_text, expl_digest, pas_msg)
+            expl_text, expl_proof, expl_digest, pas_msg)
 
 
 def _trace_rows(trace) -> list[list]:
@@ -277,22 +308,22 @@ def trace_view(state: dict) -> str:
 
 
 def explanation_view(mode: str, state: dict):
-    """The selected audience mode + the cross-mode invariance digest.
+    """Story markdown, proof markdown, and the cross-mode invariance digest.
 
-    The panel text is the readable markdown only (story first, then the
-    proof); the cross-mode digest is returned separately so it never sits
-    between the reader and the story.
+    The story is the main readable panel; the proof is rendered into a
+    labelled (collapsible) section underneath, and the cross-mode digest is
+    its own line so it never sits between the reader and the story.
     """
     report = state.get("report")
     if report is None:
-        return "Run a scenario first.", ""
+        return "Run a scenario first.", "", ""
     presented = present_all(report)
     chosen = presented[PresentationMode(mode)]
     all_modes = present_report_digests(presented)
     digest = (f"**Cross-mode check (same validated report):** {all_modes}\n\n"
               "The four modes re-render one validated report — the full raw "
               "records live in tab 3.")
-    return chosen.to_markdown(), digest
+    return chosen.story_markdown(), chosen.proof_markdown(), digest
 
 
 def present_report_digests(presented: dict) -> str:
@@ -524,7 +555,8 @@ def export_files(state: dict):
 
 # ------------------------------------------------------------------ layout
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="TRACE-XAI — explainable banking agent") as demo:
+    with gr.Blocks(title="TRACE-XAI — explainable banking agent",
+                   css=EXPLANATION_CSS) as demo:
         gr.Markdown(
             "# TRACE-XAI — evaluate an explainable banking agent\n"
             "Synthetic data only. Every number shows its unit and where it "
@@ -559,21 +591,27 @@ def build_app() -> gr.Blocks:
                 "*the same validated analysis* — same evidence, same claim "
                 "verdicts, same numbers — only the wording changes; an "
                 "UNKNOWN is never upgraded by simplifying.\n"
-                "2. **Read in order:** the *story* first (what happened, "
-                "why, which rules), then — below the divider — the *proof* "
-                "(claim checks, validation numbers, the exact records, "
-                "what stays uncertain).\n"
+                "2. **The story comes first** (what happened, why, which "
+                "rules); the *proof* — claim checks, validation numbers, "
+                "the exact records, what stays uncertain — is in the "
+                "labelled section underneath (collapse it any time).\n"
                 "3. **Every line is tagged:** [FACT] proven by the records "
                 "· [INFERENCE] an educated guess · [UNKNOWN] the records "
                 "don't say.\n"
                 "4. **Full raw records** (trace paths, values, sources) "
                 "live in tab *3 · Evidence & claims* and in the exported "
-                "report.")
+                "report.",
+                elem_id="explanation-guide")
             mode = gr.Radio(choices=MODES, value="normal",
                             label="Explanation mode")
             expl_digest = gr.Markdown(
-                value="Run a scenario to see the cross-mode invariance check.")
-            expl_out = gr.Markdown()
+                value="Run a scenario to see the cross-mode invariance check.",
+                elem_id="expl-digest")
+            expl_out = gr.Markdown(elem_id="expl-story")
+            with gr.Accordion(
+                    "The proof — claim checks, the records, what stays "
+                    "uncertain", open=True):
+                expl_proof = gr.Markdown(elem_id="expl-proof")
 
         with gr.Tab("3 · Evidence & claims"):
             ev_head = gr.Markdown()
@@ -670,7 +708,7 @@ def build_app() -> gr.Blocks:
         run_btn.click(run_scenario,
                       inputs=[scenario, custom, state, mode, use_slm],
                       outputs=[run_out, trace_rows, state, expl_out,
-                               expl_digest, pas_out])
+                               expl_proof, expl_digest, pas_out])
         run_btn.click(trace_view, inputs=[state], outputs=[trace_head])
         # populate the other tabs from the fresh state after each run
         run_btn.click(evidence_view, inputs=[state],
@@ -682,7 +720,7 @@ def build_app() -> gr.Blocks:
         run_btn.click(consolidated_view, inputs=[state],
                       outputs=[report_out])
         mode.change(explanation_view, inputs=[mode, state],
-                    outputs=[expl_out, expl_digest])
+                    outputs=[expl_out, expl_proof, expl_digest])
         rate_btn.click(csat_record, inputs=[rating, state],
                        outputs=[csat_out, state])
         for component in (use_pricing, prompt_price, completion_price,

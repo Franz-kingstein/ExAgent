@@ -74,7 +74,8 @@ class TestRunAndTrace:
             assert "Guardrail" in out[0], name
             assert len(out[1]) >= 4, name            # trace rows
             assert "explanation" in out[3].lower(), name   # expl panel filled
-            assert "Run complete" in out[5], name          # PAS prompt shown
+            assert "Claims checked" in out[4], name         # proof panel filled
+            assert "Run complete" in out[6], name           # PAS prompt shown
 
     def test_custom_task_runs_in_synthetic_sandbox(self):
         s = gui._fresh_state()
@@ -109,19 +110,19 @@ class TestExplanationsAndEvidence:
     def test_all_four_modes_render(self, state):
         texts = {}
         for mode in gui.MODES:
-            text, digest = gui.explanation_view(mode, state)
-            texts[mode] = text
-            # the story panel is pure markdown; the invariance check is
-            # returned as its own digest line, not between reader and story
+            text, proof, digest = gui.explanation_view(mode, state)
+            texts[mode] = text + proof
+            # story panel is pure markdown; the invariance check is its own
+            # line, never between reader and story
             assert "Cross-mode check" in digest
             assert "✅" in digest and "❌" not in digest
         assert len(set(texts.values())) == 4      # wording really differs
 
     def test_explanation_panel_is_markdown_not_text_artifacts(self, state):
-        """The UI panel must use headings/legend, not '-- title --' rows."""
+        """The UI panels must use headings/legend, not '-- title --' rows."""
         for mode in gui.MODES:
-            text, _ = gui.explanation_view(mode, state)
-            for line in text.splitlines():
+            text, proof, _ = gui.explanation_view(mode, state)
+            for line in (text + proof).splitlines():
                 assert not line.startswith("-- "), \
                     f"{mode}: plain-text separator leaked into the panel"
             assert "### " in text
@@ -129,9 +130,19 @@ class TestExplanationsAndEvidence:
 
     def test_explanation_keeps_unknown_visible(self, pipeline_state):
         """UNKNOWN claims must still be labelled UNKNOWN in the panel."""
-        text, _ = gui.explanation_view("eli5", pipeline_state)
-        assert "UNKNOWN" in text or "we cannot tell" in text \
+        text, proof, _ = gui.explanation_view("eli5", pipeline_state)
+        assert "UNKNOWN" in text + proof or "we cannot tell" in text \
             or "nobody knows" in text
+
+    def test_story_and_proof_split_cleanly(self, state):
+        """The story panel stays story; numbers/verdicts live in proof."""
+        story, proof, digest = gui.explanation_view("normal", state)
+        assert "Cross-mode check" in digest
+        assert "**How to read the tags:**" in story   # legend opens the story
+        assert "Claims checked" not in story          # numbers live in proof
+        assert "Claims checked" in proof
+        assert "Guardrail:" in proof
+        assert "[FACT]" in story                      # story is tagged lines
 
     def test_evidence_and_claims_tables_populated(self, state):
         head, index_rows, rows = gui.evidence_view(state)

@@ -353,6 +353,27 @@ class TestMarkdownRendering:
                                  "compliant"):
                         assert word not in c.rendered, (mode, c.rendered)
 
+    def test_story_and_proof_halves_compose_the_document(self,
+                                                         violation_report):
+        """The UI shows story and proof in two panels: the halves must
+        compose back into the exact document, losing nothing."""
+        for mode in MODES:
+            p = present_report(violation_report, mode)
+            story, proof = p.story_markdown(), p.proof_markdown()
+            assert p.to_markdown() == story + "\n\n" + proof
+            # story half: legend and rules, no validation numbers
+            assert "How to read the tags" in story
+            assert "Claims checked" not in story
+            # proof half: verdicts, numbers, every evidence ref id
+            assert "Claims checked" in proof
+            for claim in p.status_digest():
+                assert f"\"{claim}\"" in proof
+            for ref in p.evidence_index:
+                ref_id, _, _ = ref.partition(" = ")
+                assert f"**{ref_id}**" in proof, (mode, ref_id)
+            # both halves are still real markdown with headings
+            assert "### " in story and "### " in proof
+
 
 # -------------------------------------------------- facts vs inference tagging
 class TestFactsVersusInferences:

@@ -7,12 +7,14 @@ where to audit everything.
 
 ## The reading order
 
-Each explanation is written in two halves, separated by a divider:
+Each explanation is written in two halves:
 
 1. **The story** — plain sentences first: what happened, why it happened,
-   and which rules it ran into. This half uses the wording of the audience
-   you picked.
-2. **The proof** — everything you need to check our work:
+   and which rules it ran into (the rules appear as a small table: rule,
+   result, confidence, evidence). This half uses the wording of the
+   audience you picked.
+2. **The proof** — shown in the labelled section directly underneath
+   (you can collapse it, and expand it again at any time):
    - *Claim checks*: every claim the explanation makes, with its verdict
      (SUPPORTED / CONTRADICTED / UNKNOWN), the method used to check it, and
      the evidence refs it rests on.
