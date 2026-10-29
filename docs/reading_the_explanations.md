@@ -2,8 +2,8 @@
 
 Every TRACE-XAI run produces **one validated analysis**, rendered in **four
 wordings** (TECHNICAL, BUSINESS, NORMAL, ELI5). This guide explains how the
-*Explanations* page (tab 2 of the GUI) is organised, what the tags mean, and
-where to audit everything.
+*Explanations* page (tab 2 of the GUI) is organised, how facts and
+guesses are kept apart, and where to audit everything.
 
 ## The reading order
 
@@ -44,16 +44,25 @@ unsupported-claim rate and the guardrail. The green *cross-mode check* line
 under the mode picker proves it on every run: statuses, evidence refs and
 counts are identical across all four modes.
 
-## The tags on every line
+## How fact and guess stay apart
 
-| Tag | Meaning |
-|-----|---------|
-| **[FACT]** | proven by the recorded evidence |
-| **[INFERENCE]** | an educated guess — derived or predicted, not observed |
-| **[UNKNOWN]** | the records don't say — and it is never upgraded to a fact, even in ELI5 |
+The readable panels deliberately do **not** repeat a bracket-tag on every
+line. Instead:
+
+- The story states only what the records show; anything *predicted* is
+  announced in its own section — the counterfactual section opens with
+  "Predictions from simulations — not recorded events."
+- ELI5 analogies carry "(not evidence)" inline.
+- The ✅ / ❌ / ❓ marks on rules and claims are recorded verdicts, not
+  opinions, and always show their exact token (SATISFIED / VIOLATED /
+  SUPPORTED / UNKNOWN …).
 
 An UNKNOWN in a simple explanation stays an UNKNOWN. Simplifying wording
 never turns a guess into a fact or a fact into a guess.
+
+Every line still *records* its epistemic class — the audit renderings
+(consolidated report, exported text and JSON) print the exact
+FACT / INFERENCE / UNKNOWN label on every line.
 
 ## Where the raw records live
 
@@ -63,7 +72,8 @@ are not repeated inline. They are always one click away:
 - **Tab 3 · Evidence & claims** — the full evidence index (ref → exact
   recorded value) and every claim verdict with its cited evidence.
 - **Tab 7 · Export** — the same content as a text file and a JSON file
-  containing the report, all four presentations, and the metrics.
+  containing the report, all four presentations, and the metrics; the
+  text version labels every line FACT / INFERENCE / UNKNOWN for audit.
 
 ## Frequently asked questions
 

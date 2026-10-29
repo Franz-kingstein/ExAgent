@@ -321,7 +321,10 @@ class TestMarkdownRendering:
             for line in md.splitlines():
                 assert not line.startswith("-- "), line
             assert "### " in md           # real headings
-            assert "How to read the tags" in md
+            # no bracket-tags in the readable markdown (readability); the
+            # audit to_text() keeps them (TestFactsVersusInferences)
+            for tag in ("[FACT]", "[EVIDENCE]", "[INFERENCE]", "[UNKNOWN]"):
+                assert tag not in md, f"{mode}: {tag} leaked into markdown"
 
     def test_markdown_keeps_unknown_as_unknown(self, pipeline):
         """UNKNOWN must survive into the markdown with positive-free wording.
@@ -361,8 +364,9 @@ class TestMarkdownRendering:
             p = present_report(violation_report, mode)
             story, proof = p.story_markdown(), p.proof_markdown()
             assert p.to_markdown() == story + "\n\n" + proof
-            # story half: legend and rules, no validation numbers
-            assert "How to read the tags" in story
+            # story half: rules and story, no validation numbers, and no
+            # bracket-tags (removed for readability — audit text keeps them)
+            assert "[FACT]" not in story
             assert "Claims checked" not in story
             # proof half: verdicts, numbers, every evidence ref id
             assert "Claims checked" in proof

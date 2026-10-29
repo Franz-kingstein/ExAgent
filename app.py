@@ -595,10 +595,12 @@ def build_app() -> gr.Blocks:
                 "rules); the *proof* — claim checks, validation numbers, "
                 "the exact records, what stays uncertain — is in the "
                 "labelled section underneath (collapse it any time).\n"
-                "3. **Every line is tagged:** [FACT] proven by the records "
-                "· [INFERENCE] an educated guess · [UNKNOWN] the records "
-                "don't say.\n"
-                "4. **Full raw records** (trace paths, values, sources) "
+                "3. **Fact vs guess:** the story states only what the "
+                "records show; anything *predicted* (like counterfactuals) "
+                "is announced in its own section, never mixed into the "
+                "facts.\n"
+                "4. **Full raw records** (trace paths, values, sources, "
+                "and the FACT / INFERENCE / UNKNOWN label of every line) "
                 "live in tab *3 · Evidence & claims* and in the exported "
                 "report.",
                 elem_id="explanation-guide")

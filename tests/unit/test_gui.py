@@ -119,14 +119,18 @@ class TestExplanationsAndEvidence:
         assert len(set(texts.values())) == 4      # wording really differs
 
     def test_explanation_panel_is_markdown_not_text_artifacts(self, state):
-        """The UI panels must use headings/legend, not '-- title --' rows."""
+        """The UI panels must use headings, not '-- title --' rows or
+        per-line bracket-tags (removed for readability; the audit report
+        in tab 7 keeps the FACT/INFERENCE/UNKNOWN labels)."""
         for mode in gui.MODES:
             text, proof, _ = gui.explanation_view(mode, state)
             for line in (text + proof).splitlines():
                 assert not line.startswith("-- "), \
                     f"{mode}: plain-text separator leaked into the panel"
             assert "### " in text
-            assert "How to read the tags" in text
+            for tag in ("[FACT]", "[EVIDENCE]", "[INFERENCE]", "[UNKNOWN]"):
+                assert tag not in text + proof, \
+                    f"{mode}: {tag} leaked into the UI panels"
 
     def test_explanation_keeps_unknown_visible(self, pipeline_state):
         """UNKNOWN claims must still be labelled UNKNOWN in the panel."""
@@ -138,11 +142,10 @@ class TestExplanationsAndEvidence:
         """The story panel stays story; numbers/verdicts live in proof."""
         story, proof, digest = gui.explanation_view("normal", state)
         assert "Cross-mode check" in digest
-        assert "**How to read the tags:**" in story   # legend opens the story
         assert "Claims checked" not in story          # numbers live in proof
         assert "Claims checked" in proof
         assert "Guardrail:" in proof
-        assert "[FACT]" in story                      # story is tagged lines
+        assert "Rules involved" in story              # story holds the rules
 
     def test_evidence_and_claims_tables_populated(self, state):
         head, index_rows, rows = gui.evidence_view(state)

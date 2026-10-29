@@ -8,8 +8,12 @@ Invariants enforced here (and asserted by tests/unit/test_presentation.py):
    so evidence references stay accessible in all four modes.
 3. Every mode carries the recorded rationale/deviation text verbatim in
    ``recorded``, so simplifying wording never drops source facts.
-4. Each presented item is tagged FACT / INFERENCE / UNKNOWN, so observed
-   facts and inferences stay distinguishable in every mode.
+4. Each presented line records its kind FACT / INFERENCE / UNKNOWN, so
+   observed facts and inferences stay distinguishable: the audit
+   renderings (``to_text()``, JSON export) print the label on every line;
+   the readable markdown panels frame fact vs guess by section
+   (counterfactuals announced as predictions, analogies marked "(not
+   evidence)") instead of cluttering each line with bracket-tags.
 5. No model is called while re-wording (deterministic pure function).
 
 The wording layer adapts *presentation* only — it is not an explainability
@@ -264,8 +268,14 @@ class PresentedExplanation(BaseModel):
 
         The UI renders this as the main panel; ``proof_markdown()`` is the
         checkable second half shown underneath. Same recorded values either
-        way — headings, bold tags, a rules table and (for the technical
-        pipe-string headline) one field per line are presentation only.
+        way — headings, the rules table and (for the technical pipe-string
+        headline) one field per line are presentation only.
+
+        No bracket-tags ([FACT] etc.) appear here: they hurt readability.
+        The kind is still recorded on every line (model, audit text and
+        JSON export carry the labels), and this panel keeps fact vs guess
+        visible by framing: counterfactuals are announced as predictions,
+        ELI5 analogies carry "(not evidence)".
         """
         intro = INTRO[self.mode]
         out: list[str] = []
@@ -281,11 +291,6 @@ class PresentedExplanation(BaseModel):
                        for field in self.headline.split(" | "))
         else:
             out.append(f"> {self.headline}")
-        out.append("")
-        out.append("**How to read the tags:** [FACT] proven by the records · "
-                   "[INFERENCE] an educated guess, not an observation · "
-                   "[UNKNOWN] the records don't say — never upgraded, even "
-                   "when the wording gets simpler.")
 
         # --- the story: what happened, why, what it ran into -------------
         for block in self.blocks:
@@ -293,8 +298,11 @@ class PresentedExplanation(BaseModel):
                 continue
             out.append("")
             out.append(f"### {block.title}")
+            if block.key == "counterfactuals":
+                out.append("*Predictions from simulations — not recorded "
+                           "events.*")
             for line in block.lines:
-                out.append(f"- **[{line.kind.value}]** {line.text}")
+                out.append(f"- {line.text}")
 
         if self.requirements:
             out.append("")
@@ -343,8 +351,7 @@ class PresentedExplanation(BaseModel):
                 word = _CLAIM_STATUS_WORD[self.mode].get(c.status, c.status)
                 label = c.status if word == c.status \
                     else f"{c.status} · {word}"
-                out.append(f"- {icon} [{c.kind.value}] **{label}** — "
-                           f"\"{c.claim}\"")
+                out.append(f"- {icon} **{label}** — \"{c.claim}\"")
                 meta = [f"checked by {c.method}",
                         f"confidence {c.confidence:.2f}"]
                 refs = sorted(_claim_refs(c.evidence))
@@ -381,7 +388,7 @@ class PresentedExplanation(BaseModel):
         if self.uncertainty:
             out.append("")
             out.append(f"### {intro['uncertainty']}")
-            out.extend(f"- **[UNKNOWN]** {u}" for u in self.uncertainty)
+            out.extend(f"- {u}" for u in self.uncertainty)
         if self.limitations:
             out.append("")
             out.append(f"### {intro['limitations']}")

@@ -58,7 +58,9 @@
       package — TECHNICAL/BUSINESS/NORMAL/ELI5 modes generated as a pure
       deterministic function of the validated `FinalXAIReport` (statuses,
       counts, guardrail and evidence refs copied, never recomputed);
-      FACT/INFERENCE/UNKNOWN tags on every rendered line; ELI5 analogies
+      FACT/INFERENCE/UNKNOWN labels on every line of the audit text
+      format (the readable UI panels later framed fact vs guess by
+      section instead — see reading_the_explanations.md); ELI5 analogies
       labelled "(not evidence)"; socket-blocking test proves no model is
       consulted; 24 tests.
 - [x] **Increment 2 — Metrics**: `metrics/` package — latency split
